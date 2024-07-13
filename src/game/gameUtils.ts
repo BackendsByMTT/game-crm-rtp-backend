@@ -201,13 +201,13 @@ export function convertSymbols(data) {
       increaseValue: element.increaseValue || {},
       freeSpin: element.freeSpin || 0
     };
-    if (element.multiplier) {
-      const multiplierObject = {};
-      element.multiplier.forEach((item, index) => {
-        multiplierObject[(5 - index).toString() + "x"] = item;
-      });
-      symbolData.multiplier = multiplierObject;
-    }
+    // if (element.multiplier) {
+    //   const multiplierObject = {};
+    //   element.multiplier.forEach((item, index) => {
+    //     multiplierObject[(5 - index).toString() + "x"] = item;
+    //   });
+    //   symbolData.multiplier = multiplierObject;
+    // }
     uiData.symbols.push(symbolData);
   });
 
