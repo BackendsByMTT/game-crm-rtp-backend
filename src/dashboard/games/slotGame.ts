@@ -7,6 +7,7 @@ import { Player } from "../users/userModel";
 import PayLines from "./PayLines";
 import { RandomResultGenerator } from "./RandomResultGenerator";
 import { CheckResult } from "./CheckResult";
+import { gambleCardGame } from "./GambleGame";
 
 export default class SlotGame {
     public settings: GameSettings;
@@ -84,11 +85,7 @@ export default class SlotGame {
             currentLines: 0,
             BetPerLines: 0,
             startGame: false,
-            gamble: {
-                game: null,
-                maxCount: 1,
-                start: false,
-            },
+            gamble: new gambleCardGame(this),
             reels: [[]],
         };
 
@@ -146,6 +143,18 @@ export default class SlotGame {
                 case "checkMoolah":
                     this.checkforMoolah();
                     break;
+
+                case "GambleInit":
+                    this.settings.gamble.resetGamble();
+                    const sendData = this.settings.gamble.sendInitGambleData(res.data.GAMBLETYPE);
+                    this.sendMessage("gambleInitData",sendData);
+                    break;
+                
+                case "GambleResultData":
+                    this.settings.gamble.getResult(res.data);
+                    break;
+                    
+                    
                 default:
                     console.warn(`Unhandled message ID: ${res.id}`);
                     this.sendError(`Unhandled message ID: ${res.id}`)
