@@ -123,42 +123,61 @@ export default class SlotGame {
 
     private messageHandler() {
         this.player.socket.on("message", (message) => {
-            const res = JSON.parse(message)
-            switch (res.id) {
-                case "SPIN":
-                    if (this.settings.startGame) {
+            try {
+                const res = JSON.parse(message)
+
+                switch (res.id) {
+                    case "SPIN":
+                        if (this.settings.startGame) {
+                            if (this.settings.currentBet > this.player.credits) {
+                                console.log("Low Balance");
+                                this.sendError("Low Balance")
+                                break;
+                            }
+
+                            this.settings.currentLines = res.data.currentLines;
+                            this.settings.BetPerLines = betMultiplier[res.data.currentBet];
+                            this.settings.currentBet = betMultiplier[res.data.currentBet] * this.settings.currentLines;
+                            this.spinResult()
+                        }
+                        break;
+
+                    case "GENRTP":
+                        if (this.settings.currentBet > this.player.credits) {
+                            console.log("Low Balance");
+                            this.sendError("Low Balance")
+                            break;
+                        }
+
                         this.settings.currentLines = res.data.currentLines;
                         this.settings.BetPerLines = betMultiplier[res.data.currentBet];
                         this.settings.currentBet = betMultiplier[res.data.currentBet] * this.settings.currentLines;
-                        this.spinResult()
-                    }
-                    break;
-                case "GENRTP":
-                    this.settings.currentLines = res.data.currentLines;
-                    this.settings.BetPerLines = betMultiplier[res.data.currentBet];
-                    this.settings.currentBet = betMultiplier[res.data.currentBet] * this.settings.currentLines;
-                    this.getRTP(res.data.spins);
-                    break;
+                        this.getRTP(res.data.spins);
+                        break;
 
-                case "checkMoolah":
-                    this.checkforMoolah();
-                    break;
+                    case "checkMoolah":
+                        this.checkforMoolah();
+                        break;
 
-                case "GambleInit":
-                    this.settings.gamble.resetGamble();
-                    const sendData = this.settings.gamble.sendInitGambleData(res.data.GAMBLETYPE);
-                    this.sendMessage("gambleInitData",sendData);
-                    break;
-                
-                case "GambleResultData":
-                    this.settings.gamble.getResult(res.data);
-                    break;
-                    
-                    
-                default:
-                    console.warn(`Unhandled message ID: ${res.id}`);
-                    this.sendError(`Unhandled message ID: ${res.id}`)
-                    break;
+                    case "GambleInit":
+                        this.settings.gamble.resetGamble();
+                        const sendData = this.settings.gamble.sendInitGambleData(res.data.GAMBLETYPE);
+                        this.sendMessage("gambleInitData", sendData);
+                        break;
+
+                    case "GambleResultData":
+                        this.settings.gamble.getResult(res.data);
+                        break;
+
+                    default:
+                        console.warn(`Unhandled message ID: ${res.id}`);
+                        this.sendError(`Unhandled message ID: ${res.id}`)
+                        break;
+
+                }
+            } catch (error) {
+                console.error("Failed to parse message:", error);
+                this.sendError("Parse error");
             }
         })
     }
@@ -179,7 +198,8 @@ export default class SlotGame {
                 console.log(`Updated credits for player ${this.player.username} to ${this.player.credits}.`);
             }
         } catch (error) {
-            console.log("ERROR UPDATE IN DB : ", error);
+            console.error("Failed to update database:", error);
+            this.sendError("Database error");
         }
     }
 
@@ -371,101 +391,118 @@ export default class SlotGame {
     }
 
     private async spinResult() {
-        if (this.settings.currentGamedata.bonus.isEnabled && this.settings.currentGamedata.bonus.type == bonusGameType.tap) {
-            this.settings.bonus.game = new BonusGame(this.settings.currentGamedata.bonus.noOfItem, this)
+        try {
+            if (this.settings.currentGamedata.bonus.isEnabled && this.settings.currentGamedata.bonus.type == bonusGameType.tap) {
+                this.settings.bonus.game = new BonusGame(this.settings.currentGamedata.bonus.noOfItem, this)
+            }
+
+            await this.deductPlayerBalance(this.settings.currentBet);
+
+            /*
+            MIDDLEWARE GOES HERE
+            */
+
+            this.settings.tempReels = [[]];
+            this.settings.bonus.start = false;
+
+            new RandomResultGenerator(this);
+            const result = new CheckResult(this)
+            result.makeResultJson(ResultType.normal)
+        } catch (error) {
+            console.error("Failed to generate spin results:", error);
+            this.sendError("Spin error");
         }
-
-        await this.deductPlayerBalance(this.settings.currentBet);
-
-        /*
-        MIDDLEWARE GOES HERE
-        */
-
-        this.settings.tempReels = [[]];
-        this.settings.bonus.start = false;
-
-        new RandomResultGenerator(this);
-        const result = new CheckResult(this)
-        result.makeResultJson(ResultType.normal)
     }
 
     private getRTP(spins: number) {
-        let spend: number = 0;
-        let won: number = 0;
+        try {
+            let spend: number = 0;
+            let won: number = 0;
 
-        for (let i = 0; i < spins; i++) {
-            this.spinResult();
-            spend += this.settings.currentBet;
-            won = this.settings._winData.totalWinningAmount
-        }
-        let rtp = 0;
-        console.log(`Bet:${this.settings.currentBet}\n,player total bet ${spend} and\n won ${won}`)
+            for (let i = 0; i < spins; i++) {
+                this.spinResult();
+                spend += this.settings.currentBet;
+                won = this.settings._winData.totalWinningAmount
+            }
+            let rtp = 0;
+            console.log(`Bet:${this.settings.currentBet}\n,player total bet ${spend} and\n won ${won}`)
 
-        if (spend > 0) {
-            rtp = (won / spend)
+            if (spend > 0) {
+                rtp = (won / spend)
+            }
+            console.log('BONUS :', this.settings.noOfBonus);
+            console.log('TOTAL BONUS : ', this.settings.totalBonuWinAmount);
+            console.log('GENERATED RTP : ', rtp)
+            return
+        } catch (error) {
+            console.error("Failed to calculate RTP:", error);
+            this.sendError("RTP calculation error");
         }
-        console.log('BONUS :', this.settings.noOfBonus);
-        console.log('TOTAL BONUS : ', this.settings.totalBonuWinAmount);
-        console.log('GENERATED RTP : ', rtp)
-        return
+
     }
 
     private checkforMoolah() {
-        console.log("--------------------- CALLED FOR CHECK FOR MOOLAHHHH ---------------------");
+        try {
+            console.log("--------------------- CALLED FOR CHECK FOR MOOLAHHHH ---------------------");
 
 
-        this.settings.tempReels = this.settings.reels;
-        const lastWinData = this.settings._winData;
+            this.settings.tempReels = this.settings.reels;
+            const lastWinData = this.settings._winData;
 
-        lastWinData.winningSymbols = this.combineUniqueSymbols(
-            this.removeRecurringIndexSymbols(lastWinData.winningSymbols)
-        );
+            lastWinData.winningSymbols = this.combineUniqueSymbols(
+                this.removeRecurringIndexSymbols(lastWinData.winningSymbols)
+            );
 
-        const index = lastWinData.winningSymbols.map((str) => {
-            const index: { x, y } = str.split(",").map(Number);
-            return index;
-        });
+            const index = lastWinData.winningSymbols.map((str) => {
+                const index: { x, y } = str.split(",").map(Number);
+                return index;
+            });
 
-        console.log("Winning Indexes " + index);
+            console.log("Winning Indexes " + index);
 
-        let matrix = [];
-        matrix = this.settings.resultSymbolMatrix;
+            let matrix = [];
+            matrix = this.settings.resultSymbolMatrix;
 
-        index.forEach(element => {
-            matrix[element[1]][element[0]] = null;
-        })
+            index.forEach(element => {
+                matrix[element[1]][element[0]] = null;
+            })
 
-        const movedArray = this.cascadeMoveTowardsNull(matrix);
+            const movedArray = this.cascadeMoveTowardsNull(matrix);
 
-        let transposed = this.transposeMatrix(movedArray);
-        let iconsToFill: number[][] = []
-        for (let i = 0; i < transposed.length; i++) {
-            let row = []
-            for (let j = 0; j < transposed[i].length; j++) {
-                if (transposed[i][j] == null) {
-                    let index = (this.settings.resultReelIndex[i] + j + 2) % this.settings.tempReels[i].length;
-                    transposed[i][j] = this.settings.tempReels[i][index];
-                    row.unshift(this.settings.tempReels[i][index]);
+            let transposed = this.transposeMatrix(movedArray);
+            let iconsToFill: number[][] = []
+            for (let i = 0; i < transposed.length; i++) {
+                let row = []
+                for (let j = 0; j < transposed[i].length; j++) {
+                    if (transposed[i][j] == null) {
+                        let index = (this.settings.resultReelIndex[i] + j + 2) % this.settings.tempReels[i].length;
+                        transposed[i][j] = this.settings.tempReels[i][index];
+                        row.unshift(this.settings.tempReels[i][index]);
+                    }
+
                 }
-
+                if (row.length > 0)
+                    iconsToFill.push(row);
             }
-            if (row.length > 0)
-                iconsToFill.push(row);
+
+
+            matrix = this.transposeMatrix(transposed);
+            // matrix.pop();
+            // matrix.pop();
+            // matrix.pop();
+            // matrix.push([ '1', '2', '3', '4', '5' ])
+            // matrix.push([ '1', '1', '1', '1', '6' ])
+            // matrix.push([ '0', '0', '0', '0', '0' ])
+            console.log("iconsTofill", iconsToFill);
+            this.settings.resultSymbolMatrix = matrix;
+
+            const result = new CheckResult(this);
+            result.makeResultJson(ResultType.moolah, iconsToFill);
+        } catch (error) {
+            console.error("Failed to check for Moolah:", error);
+            this.sendError("Moolah check error");
         }
 
-
-        matrix = this.transposeMatrix(transposed);
-        // matrix.pop();
-        // matrix.pop();
-        // matrix.pop();
-        // matrix.push([ '1', '2', '3', '4', '5' ])
-        // matrix.push([ '1', '1', '1', '1', '6' ])
-        // matrix.push([ '0', '0', '0', '0', '0' ])
-        console.log("iconsTofill", iconsToFill);
-        this.settings.resultSymbolMatrix = matrix;
-
-        const result = new CheckResult(this);
-        result.makeResultJson(ResultType.moolah, iconsToFill);
     }
 
     private combineUniqueSymbols(symbolsToEmit: string[][]): string[] {

@@ -8,15 +8,12 @@ import {
 import createHttpError from "http-errors";
 import jwt from "jsonwebtoken";
 import { config } from "../../config/config";
-
 import bcrypt from "bcrypt";
-
 import mongoose from "mongoose";
 import { User, Player } from "./userModel";
-
 import UserService from "./userService";
 import Transaction from "../transactions/transactionModel";
-import { IPlayer, IUser } from "./userType";
+import { QueryParams } from "../../game/Utils/globalTypes";
 
 export class UserController {
   private userService: UserService;
@@ -36,12 +33,12 @@ export class UserController {
     this.getAllSubordinates = this.getAllSubordinates.bind(this);
     this.getSubordinateById = this.getSubordinateById.bind(this);
     this.deleteUser = this.deleteUser.bind(this);
-    this.updateClient = this.updateClient.bind(this)
+    this.updateClient = this.updateClient.bind(this);
     this.getReport = this.getReport.bind(this);
-    this.getASubordinateReport = this.getASubordinateReport.bind(this)
-    this.getCurrentUserSubordinates = this.getCurrentUserSubordinates.bind(this)
+    this.getASubordinateReport = this.getASubordinateReport.bind(this);
+    this.getCurrentUserSubordinates =
+      this.getCurrentUserSubordinates.bind(this);
     this.generatePassword = this.generatePassword.bind(this);
-
   }
 
   public static getSubordinateRoles(role: string): string[] {
@@ -57,20 +54,20 @@ export class UserController {
     const end = new Date();
 
     switch (type) {
-      case 'weekly':
+      case "weekly":
         start.setDate(start.getDate() - start.getDay()); // set to start of the week
         start.setHours(0, 0, 0, 0);
         end.setDate(end.getDate() + (6 - end.getDay())); // set to end of the week
         end.setHours(23, 59, 59, 999);
         break;
-      case 'monthly':
+      case "monthly":
         start.setDate(1); // set to start of the month
         start.setHours(0, 0, 0, 0);
         end.setMonth(end.getMonth() + 1);
         end.setDate(0); // set to end of the month
         end.setHours(23, 59, 59, 999);
         break;
-      case 'daily':
+      case "daily":
       default:
         start.setHours(0, 0, 0, 0);
         end.setHours(23, 59, 59, 999);
@@ -108,11 +105,9 @@ export class UserController {
     res.status(200).json({ password });
   }
 
-
   async loginUser(req: Request, res: Response, next: NextFunction) {
     try {
       const { username, password } = req.body;
-
 
       if (!username || !password) {
         throw createHttpError(400, "Username, password are required");
@@ -125,23 +120,26 @@ export class UserController {
         user = await this.userService.findPlayerByUsername(username);
 
         if (!user) {
-          throw createHttpError(401, "User not found")
+          throw createHttpError(401, "User not found");
         }
       }
-
 
       const isPasswordValid = await bcrypt.compare(password, user.password);
 
       if (!isPasswordValid) {
-        throw createHttpError(401, "Invalid username or password")
+        throw createHttpError(401, "Invalid username or password");
       }
 
       user.lastLogin = new Date();
 
       user.loginTimes = (user.loginTimes || 0) + 1;
-      await user.save()
+      await user.save();
 
-      const token = jwt.sign({ id: user._id, username: user.username, role: user.role }, config.jwtSecret!, { expiresIn: "24h" });
+      const token = jwt.sign(
+        { id: user._id, username: user.username, role: user.role },
+        config.jwtSecret!,
+        { expiresIn: "24h" }
+      );
 
       res.cookie("userToken", token, {
         maxAge: 1000 * 60 * 60 * 24 * 7,
@@ -150,16 +148,14 @@ export class UserController {
       });
 
       res.status(200).json({
-
         message: "Login successful",
         token: token,
-        role: user.role
-      })
-
+        role: user.role,
+      });
     } catch (error) {
       console.log(error);
 
-      next(error)
+      next(error);
     }
   }
 
@@ -172,8 +168,14 @@ export class UserController {
       const { user } = req.body;
       const { username, role } = _req.user; // ADMIN
 
-
-      if (!user || !user.name || !user.username || !user.password || !user.role || user.credits === undefined) {
+      if (
+        !user ||
+        !user.name ||
+        !user.username ||
+        !user.password ||
+        !user.role ||
+        user.credits === undefined
+      ) {
         throw createHttpError(400, "All required fields must be provided");
       }
 
@@ -181,15 +183,19 @@ export class UserController {
         throw createHttpError(403, `A ${role} cannot create a ${user.role}`);
       }
 
-      const admin = await this.userService.findUserByUsername(username, session);
+      const admin = await this.userService.findUserByUsername(
+        username,
+        session
+      );
       if (!admin) {
-        throw createHttpError(404, "Admin not found")
+        throw createHttpError(404, "Admin not found");
       }
 
-
-      let existingUser = await this.userService.findPlayerByUsername(user.username, session) || await this.userService.findUserByUsername(user.username, session);
+      let existingUser =
+        (await this.userService.findPlayerByUsername(user.username, session)) ||
+        (await this.userService.findUserByUsername(user.username, session));
       if (existingUser) {
-        throw createHttpError(409, "User already exists")
+        throw createHttpError(409, "User already exists");
       }
 
       const hashedPassword = await bcrypt.hash(user.password, 10);
@@ -197,14 +203,29 @@ export class UserController {
       let newUser;
 
       if (user.role === "player") {
-        newUser = await this.userService.createPlayer({ ...user, createdBy: admin._id }, 0, hashedPassword, session)
-      }
-      else {
-        newUser = await this.userService.createUser({ ...user, createdBy: admin._id }, 0, hashedPassword, session);
+        newUser = await this.userService.createPlayer(
+          { ...user, createdBy: admin._id },
+          0,
+          hashedPassword,
+          session
+        );
+      } else {
+        newUser = await this.userService.createUser(
+          { ...user, createdBy: admin._id },
+          0,
+          hashedPassword,
+          session
+        );
       }
 
       if (user.credits > 0) {
-        const transaction = await this.userService.createTransaction("recharge", admin, newUser, user.credits, session);
+        const transaction = await this.userService.createTransaction(
+          "recharge",
+          admin,
+          newUser,
+          user.credits,
+          session
+        );
         newUser.transactions.push(transaction._id as mongoose.Types.ObjectId);
         admin.transactions.push(transaction._id as mongoose.Types.ObjectId);
       }
@@ -217,10 +238,9 @@ export class UserController {
       await session.commitTransaction();
       res.status(201).json(newUser);
     } catch (error) {
-      next(error)
-    }
-    finally {
-      session.endSession()
+      next(error);
+    } finally {
+      session.endSession();
     }
   }
 
@@ -254,22 +274,86 @@ export class UserController {
       const _req = req as AuthRequest;
       const { username: loggedUserName, role: loggedUserRole } = _req.user;
 
-      const loggedUser = await this.userService.findUserByUsername(loggedUserName);
+      const loggedUser = await this.userService.findUserByUsername(
+        loggedUserName
+      );
 
       if (!loggedUser) {
-        throw createHttpError(404, "User not found")
+        throw createHttpError(404, "User not found");
       }
 
       if (loggedUser.role !== "company") {
-        throw createHttpError(403, "Access denied. Only users with the role 'company' can access this resource.");
+        throw createHttpError(
+          403,
+          "Access denied. Only users with the role 'company' can access this resource."
+        );
       }
 
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
       const skip = (page - 1) * limit;
+      const filter = req.query.filter || "";
+      const search = req.query.search as string;
+      let parsedData: QueryParams = {
+        role: "",
+        status: "",
+        totalRecharged: { From: 0, To: Infinity },
+        totalRedeemed: { From: 0, To: Infinity },
+        credits: { From: 0, To: Infinity },
+        updatedAt: { From: null, To: null },
+        type: "",
+        amount: { From: 0, To: 0 },
+      };
 
-      const userCount = await User.countDocuments({ role: { $ne: "company" } });
-      const playerCount = await Player.countDocuments();
+      let role, status, redeem, recharge, credits;
+
+      if (search) {
+        parsedData = JSON.parse(search);
+        if (parsedData) {
+          role = parsedData.role;
+          status = parsedData.status;
+          redeem = parsedData.totalRedeemed;
+          recharge = parsedData.totalRecharged;
+          credits = parsedData.credits;
+        }
+      }
+
+      let query: any = {};
+      if (filter) {
+        query.username = { $regex: filter, $options: "i" };
+      }
+      if (role) {
+        query.role = { $ne: "company", $eq: role };
+      } else if (!role) {
+        query.role = { $ne: "company" };
+      }
+      if (status) {
+        query.status = status;
+      }
+      if (parsedData.totalRecharged) {
+        query.totalRecharged = {
+          $gte: parsedData.totalRecharged.From,
+          $lte: parsedData.totalRecharged.To,
+        };
+      }
+
+      if (parsedData.totalRedeemed) {
+        query.totalRedeemed = {
+          $gte: parsedData.totalRedeemed.From,
+          $lte: parsedData.totalRedeemed.To,
+        };
+      }
+
+      if (parsedData.credits) {
+        query.credits = {
+          $gte: parsedData.credits.From,
+          $lte: parsedData.credits.To,
+        };
+      }
+
+      const userCount = await User.countDocuments(query);
+      const playerCount = await Player.countDocuments(query);
+
       const totalSubordinates = userCount + playerCount;
       const totalPages = Math.ceil(totalSubordinates / limit);
 
@@ -279,7 +363,7 @@ export class UserController {
           totalSubordinates: 0,
           totalPages: 0,
           currentPage: 0,
-          subordinates: []
+          subordinates: [],
         });
       }
 
@@ -289,51 +373,51 @@ export class UserController {
           totalSubordinates,
           totalPages,
           currentPage: page,
-          subordinates: []
+          subordinates: [],
         });
       }
 
-      // Determine how many users to fetch based on the skip and limit
       let users = [];
       if (skip < userCount) {
-        users = await User.find({ role: { $ne: "company" } }).skip(skip).limit(limit);
+        users = await User.find(query).skip(skip).limit(limit);
       }
 
       const remainingLimit = limit - users.length;
       let players = [];
       if (remainingLimit > 0) {
         const playerSkip = Math.max(0, skip - userCount);
-        players = await Player.find({}).skip(playerSkip).limit(remainingLimit);
+        players = await Player.find(query)
+          .skip(playerSkip)
+          .limit(remainingLimit);
       }
 
       const allSubordinates = [...users, ...players];
       console.log(allSubordinates.length);
 
-
       res.status(200).json({
         totalSubordinates,
         totalPages,
         currentPage: page,
-        subordinates: allSubordinates
+        subordinates: allSubordinates,
       });
     } catch (error) {
       next(error);
     }
   }
 
-  async getCurrentUserSubordinates(req: Request, res: Response, next: NextFunction) {
+  async getCurrentUserSubordinates(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) {
     try {
       const _req = req as AuthRequest;
       const { username, role } = _req.user;
       const { id } = req.query;
 
-      console.log("Subor : ", id);
-
-
-
       const currentUser = await User.findOne({ username });
       if (!currentUser) {
-        throw createHttpError(401, "User not found")
+        throw createHttpError(401, "User not found");
       }
 
       const page = parseInt(req.query.page as string) || 1;
@@ -351,46 +435,108 @@ export class UserController {
           }
         }
       }
+      let filterRole, status, redeem, recharge, credits;
+      const filter = req.query.filter || "";
+      const search = req.query.search as string;
+      let parsedData: QueryParams = {
+        role: "",
+        status: "",
+        totalRecharged: { From: 0, To: Infinity },
+        totalRedeemed: { From: 0, To: Infinity },
+        credits: { From: 0, To: Infinity },
+        updatedAt: { From: new Date(), To: new Date() },
+        type: "",
+        amount: { From: 0, To: 0 },
+      };
 
+      if (search) {
+        parsedData = JSON.parse(search);
+        if (parsedData) {
+          filterRole = parsedData.role;
+          status = parsedData.status;
+          redeem = parsedData.totalRedeemed;
+          recharge = parsedData.totalRecharged;
+          credits = parsedData.credits;
+        }
+      }
+
+      let query: any = {};
+      query.createdBy = userToCheck._id;
+      if (filter) {
+        query.username = { $regex: filter, $options: "i" };
+      }
+      if (filterRole) {
+        query.role = { $ne: "company", $eq: filterRole };
+      } else if (!filterRole) {
+        query.role = { $ne: "company" };
+      }
+      if (status) {
+        query.status = status;
+      }
+      if (parsedData.totalRecharged) {
+        query.totalRecharged = {
+          $gte: parsedData.totalRecharged.From,
+          $lte: parsedData.totalRecharged.To,
+        };
+      }
+
+      if (parsedData.totalRedeemed) {
+        query.totalRedeemed = {
+          $gte: parsedData.totalRedeemed.From,
+          $lte: parsedData.totalRedeemed.To,
+        };
+      }
+
+      if (parsedData.credits) {
+        query.credits = {
+          $gte: parsedData.credits.From,
+          $lte: parsedData.credits.To,
+        };
+      }
 
       let subordinates;
       let totalSubordinates;
 
-
-
       if (userToCheck.role === "store") {
-        totalSubordinates = await Player.countDocuments({ createdBy: userToCheck._id });
-        subordinates = await Player.find({ createdBy: userToCheck._id })
+        totalSubordinates = await Player.countDocuments(query);
+        subordinates = await Player.find(query)
           .skip(skip)
           .limit(limit)
-          .select('name username status role totalRecharged totalRedeemed credits');
-      }
-      else if (userToCheck.role === "company") {
-        const userSubordinatesCount = await User.countDocuments({ createdBy: userToCheck._id });
-        const playerSubordinatesCount = await Player.countDocuments({ createdBy: userToCheck._id });
+          .select(
+            "name username status role totalRecharged totalRedeemed credits"
+          );
+      } else if (userToCheck.role === "company") {
+        const userSubordinatesCount = await User.countDocuments(query);
+        const playerSubordinatesCount = await Player.countDocuments(query);
 
         totalSubordinates = userSubordinatesCount + playerSubordinatesCount;
-
-        const userSubordinates = await User.find({ createdBy: userToCheck._id })
+        const userSubordinates = await User.find(query)
           .skip(skip)
           .limit(limit)
-          .select('name username status role totalRecharged totalRedeemed credits');
+          .select(
+            "name username status role totalRecharged totalRedeemed credits"
+          );
 
         const remainingLimit = limit - userSubordinates.length;
 
-        const playerSubordinates = remainingLimit > 0 ? await Player.find({ createdBy: userToCheck._id })
-          .skip(Math.max(skip - userSubordinatesCount, 0))
-          .limit(remainingLimit)
-          .select('name username status role totalRecharged totalRedeemed credits') : [];
+        const playerSubordinates =
+          remainingLimit > 0
+            ? await Player.find(query)
+                .skip(Math.max(skip - userSubordinatesCount, 0))
+                .limit(remainingLimit)
+                .select(
+                  "name username status role totalRecharged totalRedeemed credits"
+                )
+            : [];
 
         subordinates = [...userSubordinates, ...playerSubordinates];
-
-      }
-      else {
-        totalSubordinates = await User.countDocuments({ createdBy: userToCheck._id });
-        subordinates = await User.find({ createdBy: userToCheck._id })
+      } else {
+        totalSubordinates = await User.countDocuments(query);
+        subordinates = await User.find(query)
           .skip(skip)
-          .select('name username status role totalRecharged totalRedeemed credits');
+          .select(
+            "name username status role totalRecharged totalRedeemed credits"
+          );
       }
 
       const totalPages = Math.ceil(totalSubordinates / limit);
@@ -401,7 +547,7 @@ export class UserController {
           totalSubordinates: 0,
           totalPages: 0,
           currentPage: 0,
-          subordinates: []
+          subordinates: [],
         });
       }
 
@@ -411,7 +557,7 @@ export class UserController {
           totalSubordinates,
           totalPages,
           currentPage: page,
-          subordinates: []
+          subordinates: [],
         });
       }
 
@@ -419,11 +565,10 @@ export class UserController {
         totalSubordinates,
         totalPages,
         currentPage: page,
-        subordinates
+        subordinates,
       });
-
     } catch (error) {
-      next(error)
+      next(error);
     }
   }
 
@@ -444,13 +589,18 @@ export class UserController {
         throw createHttpError(404, "Admin Not Found");
       }
 
-      const client = (await this.userService.findUserById(clientObjectId)) || (await this.userService.findPlayerById(clientObjectId));
+      const client =
+        (await this.userService.findUserById(clientObjectId)) ||
+        (await this.userService.findPlayerById(clientObjectId));
 
       if (!client) {
         throw createHttpError(404, "User not found");
       }
 
-      if (role != "company" && !admin.subordinates.some((id) => id.equals(clientObjectId))) {
+      if (
+        role != "company" &&
+        !admin.subordinates.some((id) => id.equals(clientObjectId))
+      ) {
         throw createHttpError(403, "Client does not belong to the creator");
       }
 
@@ -459,10 +609,7 @@ export class UserController {
         !UserController.rolesHierarchy[role] ||
         !UserController.rolesHierarchy[role].includes(clientRole)
       ) {
-        throw createHttpError(
-          403,
-          `A ${role} cannot delete a ${clientRole}`
-        );
+        throw createHttpError(403, `A ${role} cannot delete a ${clientRole}`);
       }
 
       if (client instanceof User) {
@@ -478,7 +625,7 @@ export class UserController {
 
       res.status(200).json({ message: "Client deleted successfully" });
     } catch (error) {
-      next(error)
+      next(error);
     }
   }
 
@@ -488,7 +635,6 @@ export class UserController {
       const { username, role } = _req.user;
       const { clientId } = req.params;
       const { status, credits, password, existingPassword } = req.body;
-
 
       if (!clientId) {
         throw createHttpError(400, "Client Id is required");
@@ -500,14 +646,16 @@ export class UserController {
 
       admin = await this.userService.findUserByUsername(username);
       if (!admin) {
-        admin = await this.userService.findPlayerByUsername(username)
+        admin = await this.userService.findPlayerByUsername(username);
 
         if (!admin) {
           throw createHttpError(404, "Creator not found");
         }
       }
 
-      const client = (await this.userService.findUserById(clientObjectId)) || (await this.userService.findPlayerById(clientObjectId));
+      const client =
+        (await this.userService.findUserById(clientObjectId)) ||
+        (await this.userService.findPlayerById(clientObjectId));
 
       if (!client) {
         throw createHttpError(404, "Client not found");
@@ -534,10 +682,9 @@ export class UserController {
       await client.save();
 
       res.status(200).json({ message: "Client updated successfully", client });
-
     } catch (error) {
       console.log("Error in updating : ", error);
-      next(error)
+      next(error);
     }
   }
 
@@ -547,11 +694,10 @@ export class UserController {
       const { subordinateId } = req.params;
       const { username: loggedUserName, role: loggedUserRole } = _req.user;
 
-
-
-
       const subordinateObjectId = new mongoose.Types.ObjectId(subordinateId);
-      const loggedUser = await this.userService.findUserByUsername(loggedUserName);
+      const loggedUser = await this.userService.findUserByUsername(
+        loggedUserName
+      );
 
       let user;
 
@@ -565,19 +711,26 @@ export class UserController {
         }
       }
 
-
-      if (loggedUserRole === "company" || loggedUser.subordinates.includes(subordinateObjectId) || user._id.toString() == loggedUser._id.toString()) {
-
+      if (
+        loggedUserRole === "company" ||
+        loggedUser.subordinates.includes(subordinateObjectId) ||
+        user._id.toString() == loggedUser._id.toString()
+      ) {
         let client;
-
 
         switch (user.role) {
           case "company":
-            client = await User.findById(subordinateId).populate({ path: "transactions", model: Transaction });
-            const userSubordinates = await User.find({ createdBy: subordinateId })
+            client = await User.findById(subordinateId).populate({
+              path: "transactions",
+              model: Transaction,
+            });
+            const userSubordinates = await User.find({
+              createdBy: subordinateId,
+            });
 
-            const playerSubordinates = await Player.find({ createdBy: subordinateId })
-
+            const playerSubordinates = await Player.find({
+              createdBy: subordinateId,
+            });
 
             client = client.toObject(); // Convert Mongoose Document to plain JavaScript object
             client.subordinates = [...userSubordinates, ...playerSubordinates];
@@ -585,7 +738,9 @@ export class UserController {
             break;
 
           case "store":
-            client = await User.findById(subordinateId).populate({ path: "subordinates", model: Player }).populate({ path: "transactions", model: Transaction });
+            client = await User.findById(subordinateId)
+              .populate({ path: "subordinates", model: Player })
+              .populate({ path: "transactions", model: Transaction });
             break;
 
           case "player":
@@ -593,9 +748,10 @@ export class UserController {
             break;
 
           default:
-            client = await User.findById(subordinateObjectId).populate({ path: "transactions", model: Transaction, }).populate({ path: "subordinates", model: User });
+            client = await User.findById(subordinateObjectId)
+              .populate({ path: "transactions", model: Transaction })
+              .populate({ path: "subordinates", model: User });
         }
-
 
         if (!client) {
           throw createHttpError(404, "Client not found");
@@ -603,10 +759,12 @@ export class UserController {
 
         console.log(client);
 
-
         res.status(200).json(client);
       } else {
-        throw createHttpError(403, "Forbidden: You do not have the necessary permissions to access this resource.");
+        throw createHttpError(
+          403,
+          "Forbidden: You do not have the necessary permissions to access this resource."
+        );
       }
     } catch (error) {
       next(error);
@@ -618,18 +776,25 @@ export class UserController {
       const _req = req as AuthRequest;
       const { username, role } = _req.user;
       const { type, userId } = req.query;
-      const { start, end } = UserController.getStartAndEndOfPeriod(type as string);
-      const allowedAdmins = ["company", "master", "distributor", "subdistributor", "store"];
-
+      const { start, end } = UserController.getStartAndEndOfPeriod(
+        type as string
+      );
+      const allowedAdmins = [
+        "company",
+        "master",
+        "distributor",
+        "subdistributor",
+        "store",
+      ];
 
       const currentUser = await User.findOne({ username });
 
       if (!currentUser) {
-        throw createHttpError(401, "User not found")
+        throw createHttpError(401, "User not found");
       }
 
       if (!allowedAdmins.includes(currentUser.role)) {
-        throw createHttpError(400, "Access denied : Invalid User ")
+        throw createHttpError(400, "Access denied : Invalid User ");
       }
 
       let targetUser = currentUser;
@@ -648,9 +813,7 @@ export class UserController {
         targetUser = subordinate;
       }
 
-
       if (targetUser.role === "company") {
-
         // Total Recharge Amount
         const totalRechargedAmt = await Transaction.aggregate([
           {
@@ -659,22 +822,23 @@ export class UserController {
                 {
                   createdAt: {
                     $gte: start,
-                    $lte: end
-                  }
+                    $lte: end,
+                  },
                 },
                 {
-                  type: "recharge"
-                }
-              ]
-            }
-          }, {
+                  type: "recharge",
+                },
+              ],
+            },
+          },
+          {
             $group: {
               _id: null,
               totalAmount: {
-                $sum: "$amount"
-              }
-            }
-          }
+                $sum: "$amount",
+              },
+            },
+          },
         ]);
 
         // Total Redeem Amount
@@ -685,47 +849,50 @@ export class UserController {
                 {
                   createdAt: {
                     $gte: start,
-                    $lte: end
-                  }
+                    $lte: end,
+                  },
                 },
                 {
-                  type: "redeem"
-                }
-              ]
-            }
-          }, {
+                  type: "redeem",
+                },
+              ],
+            },
+          },
+          {
             $group: {
               _id: null,
               totalAmount: {
-                $sum: "$amount"
-              }
-            }
-          }
+                $sum: "$amount",
+              },
+            },
+          },
         ]);
-
 
         const users = await User.aggregate([
           {
             $match: {
               $and: [
                 {
-                  role: { $ne: targetUser.role }
+                  role: { $ne: targetUser.role },
                 },
                 {
-                  createdAt: { $gte: start, $lte: end }
-                }
-              ]
-            }
+                  createdAt: { $gte: start, $lte: end },
+                },
+              ],
+            },
           },
           {
             $group: {
               _id: "$role",
-              count: { $sum: 1 }
-            }
-          }
+              count: { $sum: 1 },
+            },
+          },
         ]);
 
-        const players = await Player.countDocuments({ role: "player", createdAt: { $gte: start, $lte: end } })
+        const players = await Player.countDocuments({
+          role: "player",
+          createdAt: { $gte: start, $lte: end },
+        });
 
         const counts = users.reduce((acc: Record<string, number>, curr) => {
           acc[curr._id] = curr.count;
@@ -734,13 +901,12 @@ export class UserController {
 
         counts["player"] = players;
 
-
         // Transactions
         const transactions = await Transaction.find({
           createdAt: { $gte: start, $lte: end },
-        }).sort({ createdAt: -1 }).limit(9);
-
-
+        })
+          .sort({ createdAt: -1 })
+          .limit(9);
 
         return res.status(200).json({
           username: targetUser.username,
@@ -748,11 +914,9 @@ export class UserController {
           recharge: totalRechargedAmt[0]?.totalAmount || 0,
           redeem: totalRedeemedAmt[0]?.totalAmount || 0,
           users: counts,
-          transactions: transactions
+          transactions: transactions,
         });
-      }
-      else {
-
+      } else {
         const userRechargeAmt = await Transaction.aggregate([
           {
             $match: {
@@ -760,28 +924,27 @@ export class UserController {
                 {
                   createdAt: {
                     $gte: start,
-                    $lte: end
-                  }
+                    $lte: end,
+                  },
                 },
                 {
-                  type: "recharge"
+                  type: "recharge",
                 },
                 {
-                  creditor: targetUser.username
-                }
-              ]
-            }
+                  creditor: targetUser.username,
+                },
+              ],
+            },
           },
           {
             $group: {
               _id: null,
               totalAmount: {
-                $sum: "$amount"
-              }
-            }
-          }
+                $sum: "$amount",
+              },
+            },
+          },
         ]);
-
 
         const userRedeemAmt = await Transaction.aggregate([
           {
@@ -790,31 +953,37 @@ export class UserController {
                 {
                   createdAt: {
                     $gte: start,
-                    $lte: end
-                  }
+                    $lte: end,
+                  },
                 },
                 {
-                  type: "redeem"
+                  type: "redeem",
                 },
                 {
-                  debtor: targetUser.username
-                }
-              ]
-            }
+                  debtor: targetUser.username,
+                },
+              ],
+            },
           },
           {
             $group: {
               _id: null,
               totalAmount: {
-                $sum: "$amount"
-              }
-            }
-          }
-        ])
+                $sum: "$amount",
+              },
+            },
+          },
+        ]);
 
-
-        const userTransactions = await Transaction.find({ $or: [{ debtor: targetUser.username }, { creditor: targetUser.username }], createdAt: { $gte: start, $lte: end } }).sort({ createdAt: -1 }).limit(9);
-
+        const userTransactions = await Transaction.find({
+          $or: [
+            { debtor: targetUser.username },
+            { creditor: targetUser.username },
+          ],
+          createdAt: { $gte: start, $lte: end },
+        })
+          .sort({ createdAt: -1 })
+          .limit(9);
 
         let users;
         if (targetUser.role === "store" || targetUser.role === "player") {
@@ -823,56 +992,55 @@ export class UserController {
               $match: {
                 $and: [
                   {
-                    createdBy: targetUser._id
+                    createdBy: targetUser._id,
                   },
                   {
-                    createdAt: { $gte: start, $lte: end }
-                  }
-                ]
-              }
+                    createdAt: { $gte: start, $lte: end },
+                  },
+                ],
+              },
             },
             {
               $group: {
                 _id: "$status",
-                count: { $sum: 1 }
-              }
-            }
-          ])
-        }
-        else {
+                count: { $sum: 1 },
+              },
+            },
+          ]);
+        } else {
           users = await User.aggregate([
             {
               $match: {
                 $and: [
                   {
-                    createdBy: targetUser._id
+                    createdBy: targetUser._id,
                   },
                   {
-                    createdAt: { $gte: start, $lte: end }
-                  }
-                ]
-              }
+                    createdAt: { $gte: start, $lte: end },
+                  },
+                ],
+              },
             },
             {
               $group: {
                 _id: "$status",
-                count: { $sum: 1 }
-              }
-            }
-          ])
+                count: { $sum: 1 },
+              },
+            },
+          ]);
         }
 
-
-
-        const counts = users.reduce((acc: { active: number, inactive: number }, curr) => {
-          if (curr._id === "active") {
-            acc.active += curr.count;
-          } else {
-            acc.inactive += curr.count;
-          }
-          return acc;
-        }, { active: 0, inactive: 0 });
-
+        const counts = users.reduce(
+          (acc: { active: number; inactive: number }, curr) => {
+            if (curr._id === "active") {
+              acc.active += curr.count;
+            } else {
+              acc.inactive += curr.count;
+            }
+            return acc;
+          },
+          { active: 0, inactive: 0 }
+        );
 
         return res.status(200).json({
           username: targetUser.username,
@@ -880,12 +1048,10 @@ export class UserController {
           recharge: userRechargeAmt[0]?.totalAmount || 0,
           redeem: userRedeemAmt[0]?.totalAmount || 0,
           users: counts,
-          transactions: userTransactions
-        })
+          transactions: userTransactions,
+        });
       }
-
-    }
-    catch (error) {
+    } catch (error) {
       next(error);
     }
   }
@@ -896,75 +1062,77 @@ export class UserController {
       const { username: loggedUsername, role: loggedUserRole } = _req.user;
       const { subordinateId } = req.params;
       const { type } = req.query;
-      const { start, end } = UserController.getStartAndEndOfPeriod(type as string);
-
+      const { start, end } = UserController.getStartAndEndOfPeriod(
+        type as string
+      );
 
       const subordinateObjectId = new mongoose.Types.ObjectId(subordinateId);
 
       // Fetch subordinate details
       let subordinate = await User.findById(subordinateObjectId);
 
-
       if (!subordinate) {
-        subordinate = await Player.findById(subordinateObjectId)
+        subordinate = await Player.findById(subordinateObjectId);
 
         if (!subordinate) {
           throw createHttpError(404, "Subordinate not found");
-
         }
       }
-
 
       // Fetch today's transactions where the subordinate is the creditor
       const transactionsTodayAsCreditor = await Transaction.find({
         creditor: subordinate.username,
-        createdAt: { $gte: start, $lte: end }
+        createdAt: { $gte: start, $lte: end },
       });
 
       // Aggregate the total credits given to the subordinate today
-      const totalCreditsGivenToday = transactionsTodayAsCreditor.reduce((sum, t) => sum + t.amount, 0);
+      const totalCreditsGivenToday = transactionsTodayAsCreditor.reduce(
+        (sum, t) => sum + t.amount,
+        0
+      );
 
       // Fetch today's transactions where the subordinate is the debtor
       const transactionsTodayAsDebtor = await Transaction.find({
         debtor: subordinate.username,
-        createdAt: { $gte: start, $lte: end }
+        createdAt: { $gte: start, $lte: end },
       });
 
       // Aggregate the total money spent by the subordinate today
-      const totalMoneySpentToday = transactionsTodayAsDebtor.reduce((sum, t) => sum + t.amount, 0);
+      const totalMoneySpentToday = transactionsTodayAsDebtor.reduce(
+        (sum, t) => sum + t.amount,
+        0
+      );
 
       // Combine both sets of transactions
-      const allTransactions = [...transactionsTodayAsCreditor, ...transactionsTodayAsDebtor];
-
+      const allTransactions = [
+        ...transactionsTodayAsCreditor,
+        ...transactionsTodayAsDebtor,
+      ];
 
       // Fetch users and players created by this subordinate today
       const usersCreatedToday = await User.find({
         createdBy: subordinate._id,
-        createdAt: { $gte: start, $lte: end }
+        createdAt: { $gte: start, $lte: end },
       });
-
 
       const playersCreatedToday = await Player.find({
         createdBy: subordinate._id,
-        createdAt: { $gte: start, $lte: end }
+        createdAt: { $gte: start, $lte: end },
       });
-
 
       const report = {
         creditsGiven: totalCreditsGivenToday,
         moneySpent: totalMoneySpentToday,
         transactions: allTransactions, // All transactions related to the subordinate
         users: usersCreatedToday,
-        players: playersCreatedToday
+        players: playersCreatedToday,
       };
 
-      res.status(200).json(report)
+      res.status(200).json(report);
     } catch (error) {
       console.log(error);
 
-      next(error)
+      next(error);
     }
   }
-
 }
-

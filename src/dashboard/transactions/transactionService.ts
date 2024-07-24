@@ -4,9 +4,16 @@ import { rolesHierarchy } from "../../utils/utils";
 import createHttpError from "http-errors";
 import Transaction from "./transactionModel";
 import { Player, User } from "../users/userModel";
+import { QueryParams } from "../../game/Utils/globalTypes";
 
 export class TransactionService {
-  async createTransaction(type: string, manager: any, client: any, amount: number, session: mongoose.ClientSession): Promise<ITransaction> {
+  async createTransaction(
+    type: string,
+    manager: any,
+    client: any,
+    amount: number,
+    session: mongoose.ClientSession
+  ): Promise<ITransaction> {
     if (!rolesHierarchy[manager.role]?.includes(client.role)) {
       throw createHttpError(
         403,
@@ -44,16 +51,24 @@ export class TransactionService {
     return transaction;
   }
 
-  async getTransactions(username: string, page: number, limit: number) {
+  async getTransactions(
+    username: string,
+    page: number,
+    limit: number,
+    query: QueryParams
+  ) {
     const skip = (page - 1) * limit;
 
-    const user = await User.findOne({ username }) || await Player.findOne({ username });
+    const user =
+      (await User.findOne({ username })) ||
+      (await Player.findOne({ username }));
     if (!user) {
       throw new Error("User not found");
     }
 
     const totalTransactions = await Transaction.countDocuments({
-      $or: [{ debtor: user.username }, { creditor: user.username }]
+      $or: [{ debtor: user.username }, { creditor: user.username }],
+      ...query,
     });
 
     const totalPages = Math.ceil(totalTransactions / limit);
@@ -64,7 +79,7 @@ export class TransactionService {
         totalTransactions: 0,
         totalPages: 0,
         currentPage: 0,
-        outOfRange: false
+        outOfRange: false,
       };
     }
 
@@ -74,12 +89,13 @@ export class TransactionService {
         totalTransactions,
         totalPages,
         currentPage: page,
-        outOfRange: true
+        outOfRange: true,
       };
     }
 
     const transactions = await Transaction.find({
-      $or: [{ debtor: user.username }, { creditor: user.username }]
+      $or: [{ debtor: user.username }, { creditor: user.username }],
+      ...query,
     })
       .skip(skip)
       .limit(limit);
@@ -89,10 +105,9 @@ export class TransactionService {
       totalTransactions,
       totalPages,
       currentPage: page,
-      outOfRange: false
+      outOfRange: false,
     };
   }
-
 
   deleteTransaction(id: string, session: mongoose.ClientSession) {
     return Transaction.findByIdAndDelete(id).session(session);

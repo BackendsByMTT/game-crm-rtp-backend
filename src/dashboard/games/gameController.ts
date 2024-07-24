@@ -4,9 +4,8 @@ import createHttpError from "http-errors";
 import mongoose from "mongoose";
 import { AuthRequest } from "../../utils/utils";
 import { Player } from "../users/userModel";
-import cloudinary from 'cloudinary';
+import cloudinary from "cloudinary";
 import { config } from "../../config/config";
-
 
 cloudinary.v2.config({
   cloud_name: config.cloud_name,
@@ -21,10 +20,9 @@ interface GameRequest extends Request {
 }
 
 export class GameController {
-
   constructor() {
     this.getGames = this.getGames.bind(this);
-    this.getGameBySlug = this.getGameBySlug.bind(this)
+    this.getGameBySlug = this.getGameBySlug.bind(this);
     this.addGame = this.addGame.bind(this);
     this.addPlatform = this.addPlatform.bind(this);
     this.getPlatforms = this.getPlatforms.bind(this);
@@ -37,25 +35,27 @@ export class GameController {
   async getGames(req: Request, res: Response, next: NextFunction) {
     try {
       const _req = req as AuthRequest;
-      const { category, platform } = req.query as { category?: string; platform: string };
+      const { category, platform } = req.query as {
+        category?: string;
+        platform: string;
+      };
       const { username, role } = _req.user;
-
 
       if (!platform) {
         throw createHttpError(400, "Platform query parameter is required");
       }
 
       if (role === "player") {
-
         if (category === "fav") {
           const player = await Player.findOne({ username });
           if (!player) {
             throw createHttpError(404, "Player not found");
           }
 
-          const favoriteGameIds = player.favouriteGames.map(game => new mongoose.Types.ObjectId(game));
+          const favoriteGameIds = player.favouriteGames.map(
+            (game) => new mongoose.Types.ObjectId(game)
+          );
           console.log("favoriteGameIds : ", favoriteGameIds);
-
 
           const favoriteGames = await Platform.aggregate([
             { $match: { name: platform } },
@@ -64,33 +64,36 @@ export class GameController {
             {
               $group: {
                 _id: "$_id",
-                games: { $push: "$games" }
-              }
+                games: { $push: "$games" },
+              },
             },
-            { $project: { "games.url": 0 } }
+            { $project: { "games.url": 0 } },
           ]);
 
           console.log("favoriteGames : ", favoriteGames[0]?.games);
-
 
           if (!favoriteGames.length) {
             return res.status(200).json({ featured: [], others: [] });
           }
 
-          return res.status(200).json({ featured: [], others: favoriteGames[0]?.games });
+          return res
+            .status(200)
+            .json({ featured: [], others: favoriteGames[0]?.games });
         } else {
           const platformDoc = await Platform.aggregate([
             { $match: { name: platform } },
             { $unwind: "$games" },
-            { $match: category !== "all" ? { "games.category": category } : {} },
+            {
+              $match: category !== "all" ? { "games.category": category } : {},
+            },
             { $sort: { "games.createdAt": -1 } },
             {
               $group: {
                 _id: "$_id",
-                games: { $push: "$games" }
-              }
+                games: { $push: "$games" },
+              },
             },
-            { $project: { "games.url": 0 } }
+            { $project: { "games.url": 0 } },
           ]);
 
           if (!platformDoc.length) {
@@ -104,27 +107,33 @@ export class GameController {
           return res.status(200).json({ featured, others });
         }
       } else if (role === "company") {
-
         const platformDoc = await Platform.aggregate([
-          { $match: category !== "all" ? { name: category } : {} },
+          {
+            $match: category !== "all" ? { name: category } : {},
+          },
           { $unwind: "$games" },
           { $sort: { "games.createdAt": -1 } },
           {
             $group: {
               _id: "$_id",
-              games: { $push: "$games" }
-            }
+              games: { $push: "$games" },
+            },
           },
         ]);
 
-
         // Flatten the array of games from multiple platforms if category is "all"
-        const allGames = platformDoc.reduce((acc, platform) => acc.concat(platform.games), []);
-
+        const allGames = platformDoc.reduce(
+          (acc, platform) => acc.concat(platform.games),
+          []
+        );
         return res.status(200).json(allGames);
-
       } else {
-        return next(createHttpError(403, "Access denied: You don't have permission to access this resource."));
+        return next(
+          createHttpError(
+            403,
+            "Access denied: You don't have permission to access this resource."
+          )
+        );
       }
     } catch (error) {
       next(error);
@@ -137,7 +146,7 @@ export class GameController {
       const { gameId: slug } = req.params;
 
       if (!slug) {
-        throw createHttpError(400, "Slug parameter is required")
+        throw createHttpError(400, "Slug parameter is required");
       }
 
       const platform = await Platform.aggregate([
@@ -147,14 +156,13 @@ export class GameController {
           $project: {
             _id: 0,
             url: "$games.url",
-            status: "$games.status"
-          }
-        }
+            status: "$games.status",
+          },
+        },
       ]);
 
-
       if (!platform || platform.length === 0) {
-        throw createHttpError(404, "Game not found")
+        throw createHttpError(404, "Game not found");
       }
 
       const game = platform[0];
@@ -162,7 +170,9 @@ export class GameController {
       if (game.status === "active") {
         res.status(200).json({ url: game.url });
       } else {
-        res.status(200).json({ message: "The game is currently under maintenance." });
+        res
+          .status(200)
+          .json({ message: "The game is currently under maintenance." });
       }
     } catch (error) {
       next(error);
@@ -181,53 +191,86 @@ export class GameController {
       const { role } = _req.user;
 
       if (role != "company") {
-        throw createHttpError(401, "Access denied: You don't have permission to add games")
+        throw createHttpError(
+          401,
+          "Access denied: You don't have permission to add games"
+        );
       }
 
-      const { name, url, type, category, status, tagName, slug, platform: platformName } = req.body;
+      const {
+        name,
+        url,
+        type,
+        category,
+        status,
+        tagName,
+        slug,
+        platform: platformName,
+      } = req.body;
       console.log("Add : ", req.body);
       console.log("Thumb : ", req.files.thumbnail);
       console.log("payoutFile : ", req.files.payoutFile);
 
-
-
-      if (!name || !url || !type || !category || !status || !tagName || !slug || !req.files.thumbnail || !req.files.payoutFile || !platformName) {
-        throw createHttpError(400, "All required fields must be provided, including the payout file and platform");
+      if (
+        !name ||
+        !url ||
+        !type ||
+        !category ||
+        !status ||
+        !tagName ||
+        !slug ||
+        !req.files.thumbnail ||
+        !req.files.payoutFile ||
+        !platformName
+      ) {
+        throw createHttpError(
+          400,
+          "All required fields must be provided, including the payout file and platform"
+        );
       }
 
       const platform = await Platform.findOne({ name: platformName });
       if (!platform) {
-        throw createHttpError(404, "Platform not found")
+        throw createHttpError(404, "Platform not found");
       }
 
       const existingGame = await Platform.aggregate([
         { $match: { _id: platform._id } },
-        { $unwind: '$games' }, // Deconstruct the games array
-        { $match: { $or: [{ 'games.name': name }, { 'games.slug': slug }] } },
-        { $limit: 1 } // Limit the result to 1 document for performance
-      ])
+        { $unwind: "$games" }, // Deconstruct the games array
+        { $match: { $or: [{ "games.name": name }, { "games.slug": slug }] } },
+        { $limit: 1 }, // Limit the result to 1 document for performance
+      ]);
 
       if (existingGame.length > 0) {
-        throw createHttpError(400, "Game already exists in the platform")
+        throw createHttpError(400, "Game already exists in the platform");
       }
 
       // Upload thumbnail to Cloudinary
       const thumbnailBuffer = req.files.thumbnail[0].buffer;
       try {
-        thumbnailUploadResult = await new Promise<cloudinary.UploadApiResponse>((resolve, reject) => {
-          cloudinary.v2.uploader.upload_stream({ resource_type: 'image', folder: platformName }, (error, result) => {
-            if (error) {
-              return reject(error);
-            }
-            resolve(result as cloudinary.UploadApiResponse);
-          }).end(thumbnailBuffer);
-        });
+        thumbnailUploadResult = await new Promise<cloudinary.UploadApiResponse>(
+          (resolve, reject) => {
+            cloudinary.v2.uploader
+              .upload_stream(
+                { resource_type: "image", folder: platformName },
+                (error, result) => {
+                  if (error) {
+                    return reject(error);
+                  }
+                  resolve(result as cloudinary.UploadApiResponse);
+                }
+              )
+              .end(thumbnailBuffer);
+          }
+        );
       } catch (uploadError) {
         throw createHttpError(500, "Failed to upload thumbnail");
       }
 
       // Handle file for payout
-      const jsonData = JSON.parse(req.files.payoutFile[0].buffer.toString('utf-8'));
+      const jsonData = JSON.parse(
+        req.files.payoutFile[0].buffer.toString("utf-8")
+      );
 
       // Check if a Payout with the same gameName already exists
       let payoutId;
@@ -256,7 +299,6 @@ export class GameController {
         payout: payoutId,
       };
 
-
       platform.games.push(newGame as any);
       await platform.save({ session });
 
@@ -270,13 +312,19 @@ export class GameController {
 
       // If thumbnail was uploaded but an error occurred afterward, delete the thumbnail
       if (thumbnailUploadResult && thumbnailUploadResult.public_id) {
-        cloudinary.v2.uploader.destroy(thumbnailUploadResult.public_id, (destroyError, result) => {
-          if (destroyError) {
-            console.log("Failed to delete thumbnail from Cloudinary:", destroyError);
-          } else {
-            console.log("Thumbnail deleted from Cloudinary:", result);
+        cloudinary.v2.uploader.destroy(
+          thumbnailUploadResult.public_id,
+          (destroyError, result) => {
+            if (destroyError) {
+              console.log(
+                "Failed to delete thumbnail from Cloudinary:",
+                destroyError
+              );
+            } else {
+              console.log("Thumbnail deleted from Cloudinary:", result);
+            }
           }
-        });
+        );
       }
 
       next(error);
@@ -290,11 +338,13 @@ export class GameController {
       const { role } = _req.user;
 
       if (role != "company") {
-        throw createHttpError(401, "Access denied: You don't have permission to add games");
+        throw createHttpError(
+          401,
+          "Access denied: You don't have permission to add games"
+        );
       }
 
       const { name } = req.body;
-
 
       if (!name) {
         throw createHttpError(400, "Platform name is required");
@@ -302,7 +352,10 @@ export class GameController {
 
       const existingPlatform = await Platform.findOne({ name });
       if (existingPlatform) {
-        throw createHttpError(400, "Platform with the same name already exists")
+        throw createHttpError(
+          400,
+          "Platform with the same name already exists"
+        );
       }
       const newPlatform = new Platform({ name, games: [] });
       const savedPlatform = await newPlatform.save();
@@ -321,11 +374,14 @@ export class GameController {
       const { role } = _req.user;
 
       if (role != "company") {
-        throw createHttpError(401, "Access denied: You don't have permission to add games");
+        throw createHttpError(
+          401,
+          "Access denied: You don't have permission to add games"
+        );
       }
 
       const platforms = await Platform.find().select("name");
-      res.status(200).json(platforms)
+      res.status(200).json(platforms);
     } catch (error) {
       console.error("Error fetching platforms:", error);
       next(error);
@@ -346,7 +402,6 @@ export class GameController {
       const { status, slug, platformName, ...updateFields } = req.body;
       console.log("Update Game : ", req.body);
 
-
       if (!gameId) {
         throw createHttpError(400, "Game ID is required");
       }
@@ -356,14 +411,17 @@ export class GameController {
       }
 
       if (role !== "company") {
-        throw createHttpError(401, "Access denied: You don't have permission to update games");
+        throw createHttpError(
+          401,
+          "Access denied: You don't have permission to update games"
+        );
       }
 
       const existingGame = await Platform.aggregate([
         { $match: { name: platformName } },
-        { $unwind: '$games' },
-        { $match: { 'games._id': new mongoose.Types.ObjectId(gameId) } },
-        { $limit: 1 }
+        { $unwind: "$games" },
+        { $match: { "games._id": new mongoose.Types.ObjectId(gameId) } },
+        { $limit: 1 },
       ]);
 
       if (!existingGame || existingGame.length === 0) {
@@ -374,24 +432,32 @@ export class GameController {
 
       // Validate the status field
       if (status && !["active", "inactive"].includes(status)) {
-        throw createHttpError(400, "Invalid status value. It should be either 'active' or 'inactive'");
+        throw createHttpError(
+          400,
+          "Invalid status value. It should be either 'active' or 'inactive'"
+        );
       }
 
       // Ensure slug is unique if it is being updated
       if (slug && slug !== game.slug) {
-        const existingGameWithSlug = await Platform.findOne({ "games.slug": slug });
+        const existingGameWithSlug = await Platform.findOne({
+          "games.slug": slug,
+        });
         if (existingGameWithSlug) {
           throw createHttpError(400, "Slug must be unique");
         }
       }
 
       // Ensure only existing fields in the document are updated
-      const fieldsToUpdate = Object.keys(updateFields).reduce((acc: any, key) => {
-        if (game[key] !== undefined) {
-          acc[key] = updateFields[key];
-        }
-        return acc;
-      }, {} as { [key: string]: any });
+      const fieldsToUpdate = Object.keys(updateFields).reduce(
+        (acc: any, key) => {
+          if (game[key] !== undefined) {
+            acc[key] = updateFields[key];
+          }
+          return acc;
+        },
+        {} as { [key: string]: any }
+      );
 
       // Include status and slug fields if they are valid
       if (status) {
@@ -403,7 +469,6 @@ export class GameController {
 
       // Handle file for payout update
       if (req.files?.payoutFile) {
-
         console.log("Payout FIle : ", req.files?.payoutFile);
 
         // Delete the old payout
@@ -412,7 +477,9 @@ export class GameController {
         }
 
         // Add the new payout
-        const jsonData = JSON.parse(req.files.payoutFile[0].buffer.toString("utf-8"));
+        const jsonData = JSON.parse(
+          req.files.payoutFile[0].buffer.toString("utf-8")
+        );
         const newPayout = new Payouts({
           gameName: game.tagName,
           data: jsonData,
@@ -428,14 +495,21 @@ export class GameController {
 
         const thumbnailBuffer = req.files.thumbnail[0].buffer;
 
-        thumbnailUploadResult = await new Promise<cloudinary.UploadApiResponse>((resolve, reject) => {
-          cloudinary.v2.uploader.upload_stream({ resource_type: 'image', folder: platformName }, (error, result) => {
-            if (error) {
-              return reject(error);
-            }
-            resolve(result as cloudinary.UploadApiResponse);
-          }).end(thumbnailBuffer);
-        });
+        thumbnailUploadResult = await new Promise<cloudinary.UploadApiResponse>(
+          (resolve, reject) => {
+            cloudinary.v2.uploader
+              .upload_stream(
+                { resource_type: "image", folder: platformName },
+                (error, result) => {
+                  if (error) {
+                    return reject(error);
+                  }
+                  resolve(result as cloudinary.UploadApiResponse);
+                }
+              )
+              .end(thumbnailBuffer);
+          }
+        );
 
         fieldsToUpdate.thumbnail = thumbnailUploadResult.secure_url; // Save the Cloudinary URL
       }
@@ -446,11 +520,14 @@ export class GameController {
       }
 
       const updatedPlatform = await Platform.findOneAndUpdate(
-        { name: platformName, 'games._id': new mongoose.Types.ObjectId(gameId) },
+        {
+          name: platformName,
+          "games._id": new mongoose.Types.ObjectId(gameId),
+        },
         {
           $set: {
-            'games.$': { ...game, ...fieldsToUpdate }
-          }
+            "games.$": { ...game, ...fieldsToUpdate },
+          },
         },
         { new: true, session }
       );
@@ -465,13 +542,19 @@ export class GameController {
       await session.abortTransaction();
 
       if (thumbnailUploadResult && thumbnailUploadResult.public_id) {
-        cloudinary.v2.uploader.destroy(thumbnailUploadResult.public_id, (destroyError, result) => {
-          if (destroyError) {
-            console.log("Failed to delete thumbnail from Cloudinary:", destroyError);
-          } else {
-            console.log("Thumbnail deleted from Cloudinary:", result);
+        cloudinary.v2.uploader.destroy(
+          thumbnailUploadResult.public_id,
+          (destroyError, result) => {
+            if (destroyError) {
+              console.log(
+                "Failed to delete thumbnail from Cloudinary:",
+                destroyError
+              );
+            } else {
+              console.log("Thumbnail deleted from Cloudinary:", result);
+            }
           }
-        });
+        );
       }
 
       if (error instanceof mongoose.Error.CastError) {
@@ -482,7 +565,6 @@ export class GameController {
     } finally {
       session.endSession();
     }
-
   }
 
   // DELETE : Delete a Game by ID
@@ -505,7 +587,10 @@ export class GameController {
       }
 
       if (role !== "company") {
-        throw createHttpError(401, "Access denied: You don't have permission to delete games");
+        throw createHttpError(
+          401,
+          "Access denied: You don't have permission to delete games"
+        );
       }
 
       const platform = await Platform.findOne({ name: platformName });
@@ -513,9 +598,11 @@ export class GameController {
         throw createHttpError(404, "Platform not found");
       }
 
-      const gameIndex = platform.games.findIndex((game: any) => game._id.equals(gameId));
+      const gameIndex = platform.games.findIndex((game: any) =>
+        game._id.equals(gameId)
+      );
       if (gameIndex === -1) {
-        throw createHttpError(404, "Game not found")
+        throw createHttpError(404, "Game not found");
       }
 
       const game = platform.games[gameIndex];
@@ -527,9 +614,9 @@ export class GameController {
             if (error) {
               return reject(error);
             }
-            resolve(result as cloudinary.UploadApiResponse)
-          })
-        })
+            resolve(result as cloudinary.UploadApiResponse);
+          });
+        });
       }
 
       // Delete the payout document
@@ -542,7 +629,7 @@ export class GameController {
       await platform.save({ session });
 
       await session.commitTransaction();
-      res.status(200).json({ message: "Game deleted successfully" })
+      res.status(200).json({ message: "Game deleted successfully" });
     } catch (error) {
       await session.abortTransaction();
       if (error instanceof mongoose.Error.CastError) {
@@ -550,13 +637,10 @@ export class GameController {
       } else {
         next(error);
       }
+    } finally {
+      session.endSession();
     }
-    finally {
-      session.endSession()
-    }
-
   }
-
 
   // PUT : Fav Game
   async addFavouriteGame(req: Request, res: Response, next: NextFunction) {
@@ -573,7 +657,10 @@ export class GameController {
       }
 
       if (type !== "add" && type !== "remove") {
-        throw createHttpError(400, "Invalid type value. It should be either 'add' or 'remove'");
+        throw createHttpError(
+          400,
+          "Invalid type value. It should be either 'add' or 'remove'"
+        );
       }
 
       const player = await Player.findById(playerId);
@@ -595,7 +682,6 @@ export class GameController {
         message = updatedPlayer.favouriteGames.includes(gameId)
           ? "Game added to favourites"
           : "Game already in favourites";
-
       } else if (type === "remove") {
         updatedPlayer = await Player.findByIdAndUpdate(
           playerId,
@@ -609,11 +695,8 @@ export class GameController {
       }
 
       return res.status(200).json({ message, data: updatedPlayer });
-
     } catch (error) {
       next(error);
     }
-  };
-
+  }
 }
-

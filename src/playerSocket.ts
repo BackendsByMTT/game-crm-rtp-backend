@@ -1,19 +1,14 @@
 import { Socket } from "socket.io";
 import { verifyPlayerToken } from "./utils/playerAuth";
 import { getPlayerCredits } from "./game/Global";
-import { MESSAGEID, MESSAGETYPE } from "./utils/utils";
 import { Platform } from "./dashboard/games/gameModel";
 import { Payouts } from "./dashboard/games/gameModel";
-import { slotMessages } from "./game/slotBackend/slotMessages";
-import { GAMETYPE } from "./game/Utils/globalTypes";
-import SlotGame from "./dashboard/games/slotGame";
-import { gameCategory, messageType } from "./dashboard/games/gameUtils";
-import { gameData } from "./game/slotBackend/testData";
-export let users: Map<string, SocketUser> = new Map();
-const RECONNECT_TIMEOUT = 60000;
 
-// HEATBEAT FOR : ewvery 20s
-// Reconnect : 
+import SlotGame from "./dashboard/games/slotGame";
+import { gameData } from "./game/slotBackend/testData";
+
+export let users: Map<string, SocketUser> = new Map();
+
 
 export class SocketUser {
     socketReady: boolean = false;
@@ -58,6 +53,10 @@ export class SocketUser {
             );
         } catch (error) {
             console.error(`Error initializing user ${this.username}:`, error);
+            if (socket.connected) {
+                socket.emit("internalError", error.message);
+            }
+            socket.disconnect();
         }
     }
 
@@ -164,24 +163,22 @@ export default async function enterPlayer(socket: Socket) {
 
         const existingUser = users.get(platformData.username);
         if (existingUser) {
-            socket.emit("internalError", "Please log out from the other device.");
-            socket.disconnect();
-
-            existingUser.socketID = socket.id;
-            await existingUser.initializeUser(socket, platformData, gameSetting);
-            console.log(`Player ${platformData.username} tried to enter from another device.`);
-
-        } else {
-            socket.data = { platformData, gameSetting };
-            const newUser = new SocketUser(socket, platformData, gameSetting);
-            users.set(platformData.username, newUser);
-
-            socket.emit("alert", `Welcome, ${platformData.username}!`);
-            console.log(`Player ${platformData.username} entered the game.`);
+            throw new Error("User already logged in from another device.");
         }
+
+        socket.data = { platformData, gameSetting };
+        const newUser = new SocketUser(socket, platformData, gameSetting);
+        users.set(platformData.username, newUser);
+
+        socket.emit("alert", `Welcome, ${platformData.username}!`);
+        console.log(`Player ${platformData.username} entered the game.`);
+
     } catch (error) {
         console.error("Error during player entry:", error);
-        socket.emit("internalError", "An error occurred during player entry.");
+        if (socket.connected) {
+            socket.emit("internalError", error.message);
+        }
+        socket.disconnect(true); // Forcefully disconnect to clean up resources
     }
 }
 
@@ -195,7 +192,8 @@ async function getPlatformData(socket: Socket) {
             credits: typeof credits === "number" ? credits : 0,
         };
     } catch (error) {
-        throw new Error("Failed to get platform data: " + error.message);
+        console.error("Failed to get platform data:", error);
+        throw error;
     }
 }
 
