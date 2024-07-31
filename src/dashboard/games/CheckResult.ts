@@ -8,7 +8,13 @@ import { ScatterPayEntry, BonusPayEntry, ResultType } from "./gameUtils";
 import { moolahPayOut } from "./testData";
 import { log } from "console";
 import { updateCredits } from "../../utils/utils";
-
+import { platform } from "os";
+interface WinSymbol {
+    symbol: string;
+    pos: string[];
+    pay: number;
+    freeSpin: number;
+}
 export class CheckResult {
     scatter: string;
     useScatter: boolean;
@@ -148,7 +154,7 @@ export class CheckResult {
                     }
 
                     this.currentGame.settings._winData.winningLines.push(index);
-                    
+
                     console.log(`Line Index : ${index} : ` + lb + " - line win: " + win);
                 }
 
@@ -157,7 +163,7 @@ export class CheckResult {
         });
 
         const filteredArray = this.checkforDuplicate(allComboWin);
-        console.log(filteredArray);
+
         let BonusArray = [];
         filteredArray.forEach((element) => {
 
@@ -242,11 +248,11 @@ export class CheckResult {
     private getPayLineWin(payLine: PayLines, lineData: any, allComboWin: any[]) {
         if (payLine == null) return null;
 
-        let master = [];
-        let winSymbols = [];
+        let master: WinSymbol[] = [];
+        let winSymbols: string[] = [];
 
         for (let i = 0; i < lineData.length; i++) {
-            let tempWinSymbols = {
+            let tempWinSymbols: WinSymbol = {
                 pos: [],
                 symbol: "",
                 pay: 0,
@@ -266,7 +272,14 @@ export class CheckResult {
                 winSymbols.push(symbolIndex);
 
                 tempWinSymbols.pos.push(symbolIndex);
-                tempWinSymbols.pay = payLine.pay;
+
+                // Set pay to 0 if the symbol is a wild symbol
+                if (s === specialIcons.wild) {
+                    tempWinSymbols.pay = 0;
+                } else {
+                    tempWinSymbols.pay = payLine.pay;
+                }
+
                 tempWinSymbols.freeSpin = payLine.freeSpins;
             }
             master.push(tempWinSymbols);
@@ -274,29 +287,36 @@ export class CheckResult {
 
         const filteredArray = master.filter((item) => item.pos.length > 0);
 
-        const groupedBySymbol = filteredArray.reduce((acc, item) => {
-            if (!acc[item.symbol]) {
-                acc[item.symbol] = {
-                    symbol: item.symbol,
-                    pos: [],
-                    pay: item.pay,
-                    freeSpin: item.freeSpin,
-                };
+        let mergedSymbol: WinSymbol = {
+            symbol: "",
+            pos: [],
+            pay: 0,
+            freeSpin: 0,
+        };
+
+        filteredArray.forEach(item => {
+            mergedSymbol.symbol = item.symbol;
+            mergedSymbol.pos = mergedSymbol.pos.concat(item.pos);
+            mergedSymbol.freeSpin = item.freeSpin;
+
+            // Only set pay if it's not a wild symbol
+            if (item.symbol !== specialIcons.wild) {
+                mergedSymbol.pay = item.pay;
             }
-            acc[item.symbol].pos = acc[item.symbol].pos.concat(item.pos);
-            return acc;
-        }, {});
+        });
 
-        const mergedArray = Object.values(groupedBySymbol);
+        // Explicitly set pay to 0 for wild symbols
+        if (mergedSymbol.symbol === specialIcons.wild) {
+            mergedSymbol.pay = 0;
+        }
 
-        // Ensure payLine.pay is only added once
-        allComboWin.push(...mergedArray);
+        console.log(mergedSymbol, "fdfdfdfdfd");
 
-        // Update player current winning once
-
-
+        allComboWin.push(mergedSymbol);
         return { freeSpins: payLine.freeSpins, pay: payLine.pay };
     }
+
+
 
 
     private getSymbolOnMatrix(index: number) {

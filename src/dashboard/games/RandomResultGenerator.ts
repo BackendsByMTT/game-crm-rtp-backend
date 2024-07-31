@@ -33,7 +33,7 @@ export class RandomResultGenerator {
         matrix.pop();
         matrix.push(['1', '5', '9', '8', '11'])
         matrix.push(['9', '2', '5', '1', '12'])
-        matrix.push(['0', '0', '10', '2', '6'])
+        matrix.push(['0', '0', '0', '0', '0'])
 
 
         current.settings.resultSymbolMatrix = matrix;
