@@ -269,8 +269,8 @@ export default class SlotGame {
     private handleSpecialSymbols(symbol: any) {
         this.settings.bonusPayTable = [];
         this.settings.scatterPayTable = [];
-        console.log("Handling special symbols" + symbol.Name); 
-        
+        console.log("Handling special symbols" + symbol.Name);
+
         switch (symbol.Name) {
             case specialIcons.jackpot:
                 this.settings.jackpot.symbolName = symbol.Name;
@@ -376,17 +376,16 @@ export default class SlotGame {
             let payTableFull = [];
             this.settings.payLine.forEach((pLine) => {
                 payTable.push(
-                    
+
                     new PayLines(pLine.line, pLine.pay, pLine.freeSpins, this.settings.wildSymbol.SymbolID.toString(), this)
                 )
             });
             for (let j = 0; j < payTable.length; j++) {
                 payTableFull.push(payTable[j]);
                 if (this.settings.useWild) {
-                    
                     let wildLines = payTable[j].getWildLines();
-                    console.log("WILD LINES",wildLines);
-                    
+                    console.log("WILD LINES", wildLines);
+
                     wildLines.forEach((wl) => {
                         payTableFull.push(wl)
                     })
@@ -460,18 +459,18 @@ export default class SlotGame {
             console.error("Failed to calculate RTP:", error);
             this.sendError("RTP calculation error");
         }
-//    let count = 0;
-//             const intervalId = setInterval(() => {
-//                 this.spinResult()
-//                 count++;
-            
-//                 // Stop after 500 calls
-//                 if (count >= spins) {
-//                     clearInterval(intervalId);
-//                 }
-//                 spend += this.settings.currentBet;
-//                 won = this.settings._winData.totalWinningAmount
-//             }, 1000);
+        //    let count = 0;
+        //             const intervalId = setInterval(() => {
+        //                 this.spinResult()
+        //                 count++;
+
+        //                 // Stop after 500 calls
+        //                 if (count >= spins) {
+        //                     clearInterval(intervalId);
+        //                 }
+        //                 spend += this.settings.currentBet;
+        //                 won = this.settings._winData.totalWinningAmount
+        //             }, 1000);
     }
 
     public checkforMoolah() {
@@ -511,7 +510,7 @@ export default class SlotGame {
                         let index = (this.settings.resultReelIndex[i] + j + 2) % this.settings.tempReels[i].length;
                         transposed[i][j] = this.settings.tempReels[i][index];
                         row.unshift(this.settings.tempReels[i][index]);
-                        this.settings.tempReels[i].splice(j,1);
+                        this.settings.tempReels[i].splice(j, 1);
                     }
 
                 }

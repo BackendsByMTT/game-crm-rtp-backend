@@ -7,6 +7,7 @@ import PayLines from "./PayLines";
 import { ScatterPayEntry, BonusPayEntry, ResultType } from "./gameUtils";
 import { moolahPayOut } from "./testData";
 import { log } from "console";
+import { updateCredits } from "../../utils/utils";
 
 export class CheckResult {
     scatter: string;
@@ -127,6 +128,7 @@ export class CheckResult {
     }
 
     private checkForWin() {
+
         let allComboWin = [];
 
         this.currentGame.settings.lineData.slice(0, this.currentGame.settings.currentLines).forEach((lb, index) => {
@@ -136,33 +138,34 @@ export class CheckResult {
             this.currentGame.settings.fullPayTable.forEach((Payline: PayLines) => {
                 //  find max win (or win with max symbols count)
                 const winTemp = this.getPayLineWin(Payline, lb, allComboWin);
-                console.log("win Temp : ",winTemp);
-                
+
+
                 if (winTemp != null) {
                     if (win == null) win = winTemp;
                     else {
                         if (win.Pay < winTemp.pay || win.FreeSpins < winTemp.freeSpins)
                             win = winTemp;
                     }
-                    
+
                     this.currentGame.settings._winData.winningLines.push(index);
+                    
                     console.log(`Line Index : ${index} : ` + lb + " - line win: " + win);
                 }
+
+
             });
         });
-        
+
         const filteredArray = this.checkforDuplicate(allComboWin);
         console.log(filteredArray);
         let BonusArray = [];
         filteredArray.forEach((element) => {
-            
+
             this.currentGame.settings._winData.winningSymbols.push(element.pos);
             this.currentGame.settings._winData.totalWinningAmount +=
                 element.pay * this.currentGame.settings.BetPerLines;
             this.currentGame.settings._winData.freeSpins += element.freeSpin;
         });
-
-
     }
 
     private checkforDuplicate(allComboWin: any[]): any[] {
@@ -261,7 +264,6 @@ export class CheckResult {
             ) {
                 const symbolIndex = i.toString() + "," + lineData[i].toString();
                 winSymbols.push(symbolIndex);
-                // gameSettings._winData.winningSymbols.push(symbolIndex);
 
                 tempWinSymbols.pos.push(symbolIndex);
                 tempWinSymbols.pay = payLine.pay;
@@ -269,7 +271,7 @@ export class CheckResult {
             }
             master.push(tempWinSymbols);
         }
-        // gameSettings._winData.winningSymbols.push(winSymbols);
+
         const filteredArray = master.filter((item) => item.pos.length > 0);
 
         const groupedBySymbol = filteredArray.reduce((acc, item) => {
@@ -285,19 +287,17 @@ export class CheckResult {
             return acc;
         }, {});
 
-        // Step 3: Convert the grouped object back into an array of objects
         const mergedArray = Object.values(groupedBySymbol);
 
-        if (!payLine.pay) payLine.pay = 0;
-
+        // Ensure payLine.pay is only added once
         allComboWin.push(...mergedArray);
-        // gameSettings._winData.freeSpins += payLine.freeSpins;
-        // gameSettings._winData.totalWinningAmount += payLine.pay
 
-        // const winData=new WinData(winSymbols, payLine.freeSpins, payLine.pay);
+        // Update player current winning once
+
 
         return { freeSpins: payLine.freeSpins, pay: payLine.pay };
     }
+
 
     private getSymbolOnMatrix(index: number) {
         let symbolsOnGrid = [];
@@ -387,8 +387,12 @@ export class CheckResult {
             }
         });
 
-        return result;
+        // If you want a single sub-array with all unique symbols
+        const winningArr: string[][] = [result.flat()];
+
+        return winningArr;
     }
+
     // return symbols from windows
     private getWindowsSymbols(reel: number) {
         let vSymbols = [];
