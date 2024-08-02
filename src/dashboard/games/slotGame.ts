@@ -1,6 +1,15 @@
 import { Socket } from "socket.io";
 import { GameData, GameSettings, WildSymbol } from "./gameType";
-import { messageType, bonusGameType, convertSymbols, shuffleArray, specialIcons, UiInitData, betMultiplier, ResultType } from "./gameUtils";
+import {
+    messageType,
+    bonusGameType,
+    convertSymbols,
+    shuffleArray,
+    specialIcons,
+    UiInitData,
+    betMultiplier,
+    ResultType,
+} from "./gameUtils";
 import { BonusGame } from "./BonusGame";
 import { WinData } from "./WinData";
 import { Player } from "../users/userModel";
@@ -18,9 +27,10 @@ export default class SlotGame {
         haveWon: number,
         currentWining: number,
         socket: Socket
+        totalbet: number
     }
     constructor(player: { username: string, credits: number, socket: Socket }, GameData: any) {
-        this.player = { ...player, haveWon: 0, currentWining: 0 };
+        this.player = { ...player, haveWon: 0, currentWining: 0, totalbet: 0 };
         this.settings = {
             currentGamedata: {
                 id: "",
@@ -91,7 +101,6 @@ export default class SlotGame {
             currentMoolahCount: 0,
         };
 
-
         this.initialize(GameData);
         this.messageHandler();
     }
@@ -107,19 +116,22 @@ export default class SlotGame {
         UiInitData.paylines = convertSymbols(this.settings.currentGamedata.Symbols);
         this.settings.startGame = true;
         this.makePayLines();
-        this.sendInitdata()
+        this.sendInitdata();
     }
 
     public sendMessage(action: string, message: any) {
-        this.player.socket.emit(messageType.MESSAGE, JSON.stringify({ id: action, message, username: this.player.username }))
+        this.player.socket.emit(
+            messageType.MESSAGE,
+            JSON.stringify({ id: action, message, username: this.player.username })
+        );
     }
 
     public sendError(message: string) {
-        this.player.socket.emit(messageType.ERROR, message)
+        this.player.socket.emit(messageType.ERROR, message);
     }
 
     public sendAlert(message: string) {
-        this.player.socket.emit(messageType.ALERT, message)
+        this.player.socket.emit(messageType.ALERT, message);
     }
 
     private messageHandler() {
@@ -130,30 +142,29 @@ export default class SlotGame {
                 switch (res.id) {
                     case "SPIN":
                         // if (this.settings.currentBet > this.player.credits) {
-                        //     console.log("Low Balance : ", this.player.credits);
-                        //     console.log("Current Bet : ", this.settings.currentBet);
                         //     this.sendError("Low Balance");
                         //     break;
                         // }
                         if (this.settings.startGame) {
                             this.settings.currentLines = res.data.currentLines;
                             this.settings.BetPerLines = betMultiplier[res.data.currentBet];
+
                             this.settings.currentBet = betMultiplier[res.data.currentBet] * this.settings.currentLines;
+
                             this.spinResult();
                         }
                         break;
 
                     case "GENRTP":
                         // if (this.settings.currentBet > this.player.credits) {
-                        //     console.log("Low Balance : ", this.player.credits);
-                        //     console.log("Current Bet : ", this.settings.currentBet);
                         //     this.sendError("Low Balance");
                         //     break;
                         // }
 
                         this.settings.currentLines = res.data.currentLines;
                         this.settings.BetPerLines = betMultiplier[res.data.currentBet];
-                        this.settings.currentBet = betMultiplier[res.data.currentBet] * this.settings.currentLines;
+                        this.settings.currentBet =
+                            betMultiplier[res.data.currentBet] * this.settings.currentLines;
                         this.getRTP(res.data.spins);
                         break;
 
@@ -164,7 +175,9 @@ export default class SlotGame {
                     case "GambleInit":
                         this.settings.gamble.resetGamble();
 
-                        const sendData = this.settings.gamble.sendInitGambleData(res.data.GAMBLETYPE);
+                        const sendData = this.settings.gamble.sendInitGambleData(
+                            res.data.GAMBLETYPE
+                        );
 
                         this.sendMessage("gambleInitData", sendData);
                         break;
@@ -185,22 +198,21 @@ export default class SlotGame {
         });
     }
 
-
     public async updateDatabase() {
         try {
-            const finalBalance = this.player.credits
+            const finalBalance = this.player.credits;
             const result = await Player.findOneAndUpdate(
                 { username: this.player.username },
                 { credits: finalBalance.toFixed(2) },
                 { new: true }
-            )
+            );
 
-            if (!result) {
-                console.log(`Player with username ${this.player.username} not found in database.`);
-            }
-            else {
-                console.log(`Updated credits for player ${this.player.username} to ${this.player.credits}.`);
-            }
+    
+
+
+
+
+        
         } catch (error) {
             console.error("Failed to update database:", error);
             this.sendError("Database error");
@@ -210,8 +222,6 @@ export default class SlotGame {
     private checkPlayerBalance() {
         if (this.player.credits < this.settings.currentBet) {
             this.sendMessage("low-balance", true);
-            console.log("PLAYER BALANCE : ", this.player.credits);
-            console.log("CURRENT BET : ", this.settings.currentBet);
             console.error("LOW BALANCE");
             return;
         }
@@ -222,10 +232,10 @@ export default class SlotGame {
             this.player.credits += credit;
             this.player.haveWon += credit;
             this.player.currentWining = credit;
-            console.log("FINAL BALANCE : ", this.player.credits);
-            // await this.updateDatabase();
+            await this.updateDatabase();
+
         } catch (error) {
-            console.error('Error updating credits in database:', error);
+            console.error("Error updating credits in database:", error);
         }
     }
 
@@ -237,25 +247,43 @@ export default class SlotGame {
 
     private initSymbols() {
         for (let i = 0; i < this.settings.currentGamedata.Symbols.length; i++) {
-            this.settings.Symbols.push(this.settings.currentGamedata.Symbols[i].Id?.toString());
-            this.settings.Weights.push(this.settings.currentGamedata.Symbols[i]?.weightedRandomness);
+            this.settings.Symbols.push(
+                this.settings.currentGamedata.Symbols[i].Id?.toString()
+            );
+            this.settings.Weights.push(
+                this.settings.currentGamedata.Symbols[i]?.weightedRandomness
+            );
         }
     }
 
     private makePayLines() {
         this.settings.currentGamedata.Symbols.forEach((element) => {
-            if (element.useWildSub || element.Name == "FreeSpin" || element.Name == "Scatter") {
-                element.multiplier?.forEach(((item, index) => {
-                    this.addPayLineSymbols(element.Id?.toString(), 5 - index, item[0], item[1]);
-                }))
+            if (
+                element.useWildSub ||
+                element.Name == "FreeSpin" ||
+                element.Name == "Scatter"
+            ) {
+                element.multiplier?.forEach((item, index) => {
+                    this.addPayLineSymbols(
+                        element.Id?.toString(),
+                        5 - index,
+                        item[0],
+                        item[1]
+                    );
+                });
+            } else {
+                this.handleSpecialSymbols(element);
+
             }
-            else {
-                this.handleSpecialSymbols(element)
-            }
-        })
+        });
     }
 
-    private addPayLineSymbols(symbol: string, repetition: number, pay: number, freeSpins: number) {
+    private addPayLineSymbols(
+        symbol: string,
+        repetition: number,
+        pay: number,
+        freeSpins: number
+    ) {
         const line: string[] = Array(repetition).fill(symbol); // Create an array with 'repetition' number of 'symbol'
 
         if (line.length != this.settings.matrix.x) {
@@ -263,13 +291,12 @@ export default class SlotGame {
             for (let i = 0; i < lengthToAdd; i++) line.push("any");
         }
 
-        this.settings.payLine.push({ line: line, pay: pay, freeSpins: freeSpins })
+        this.settings.payLine.push({ line: line, pay: pay, freeSpins: freeSpins });
     }
 
     private handleSpecialSymbols(symbol: any) {
         this.settings.bonusPayTable = [];
         this.settings.scatterPayTable = [];
-        console.log("Handling special symbols" + symbol.Name);
 
         switch (symbol.Name) {
             case specialIcons.jackpot:
@@ -311,15 +338,22 @@ export default class SlotGame {
     }
 
     private sendInitdata() {
-
         this.gameDataInit();
         this.settings.reels = this.generateInitialreel();
 
-        if (this.settings.currentGamedata.bonus.isEnabled && this.settings.currentGamedata.bonus.type == bonusGameType.spin) {
-            this.settings.bonus.game = new BonusGame(this.settings.currentGamedata.bonus.noOfItem, this)
+        if (
+            this.settings.currentGamedata.bonus.isEnabled &&
+            this.settings.currentGamedata.bonus.type == bonusGameType.spin
+        ) {
+            this.settings.bonus.game = new BonusGame(
+                this.settings.currentGamedata.bonus.noOfItem,
+                this
+            );
         }
 
-        let specialSymbols = this.settings.currentGamedata.Symbols.filter((element) => !element.useWildSub);
+        let specialSymbols = this.settings.currentGamedata.Symbols.filter(
+            (element) => !element.useWildSub
+        );
 
         const dataToSend = {
             GameData: {
@@ -331,20 +365,23 @@ export default class SlotGame {
                 autoSpin: [1, 5, 10, 20],
             },
             // TODO: Unknown source of generateData()
-            BonusData: this.settings.bonus.game != null ? this.settings.bonus.game.generateData(this.settings.bonusPayTable[0]?.pay) : [],
+            BonusData:
+                this.settings.bonus.game != null
+                    ? this.settings.bonus.game.generateData(
+                        this.settings.bonusPayTable[0]?.pay
+                    )
+                    : [],
             UIData: UiInitData,
             PlayerData: {
                 Balance: this.player.credits,
                 haveWon: this.player.haveWon,
-                currentWining: this.player.currentWining
+                currentWining: this.player.currentWining,
+                totalbet: this.player.totalbet
             },
-            maxGambleBet: 300
+            maxGambleBet: 300,
         };
 
-        // console.log("Data to send : ", dataToSend);
-
-
-        this.sendMessage("InitData", dataToSend)
+        this.sendMessage("InitData", dataToSend);
     }
 
     private generateInitialreel(): string[][] {
@@ -367,7 +404,7 @@ export default class SlotGame {
 
     private gameDataInit() {
         this.settings.lineData = this.settings.currentGamedata.linesApiData;
-        this.makeFullPayTable()
+        this.makeFullPayTable();
     }
 
     private makeFullPayTable() {
@@ -376,59 +413,64 @@ export default class SlotGame {
             let payTableFull = [];
             this.settings.payLine.forEach((pLine) => {
                 payTable.push(
-
                     new PayLines(pLine.line, pLine.pay, pLine.freeSpins, this.settings.wildSymbol.SymbolID.toString(), this)
                 )
             });
             for (let j = 0; j < payTable.length; j++) {
                 payTableFull.push(payTable[j]);
                 if (this.settings.useWild) {
+
                     let wildLines = payTable[j].getWildLines();
-                    console.log("WILD LINES", wildLines);
 
                     wildLines.forEach((wl) => {
-                        payTableFull.push(wl)
-                    })
+                        payTableFull.push(wl);
+                    });
                 }
             }
             this.settings.fullPayTable = payTableFull;
+
         } catch (error) {
-            console.log("MAKE FULL PAY TABLE : ", error);
+
 
         }
+
 
     }
 
     private async spinResult() {
         try {
             if (this.settings.currentBet > this.player.credits) {
-                console.log("Low Balance : ", this.player.credits);
-                console.log("Current Bet : ", this.settings.currentBet);
+
                 this.sendError("Low Balance");
-                return
+                return;
             }
-            if (this.settings.currentGamedata.bonus.isEnabled && this.settings.currentGamedata.bonus.type == bonusGameType.tap) {
-                this.settings.bonus.game = new BonusGame(this.settings.currentGamedata.bonus.noOfItem, this)
+            if (
+                this.settings.currentGamedata.bonus.isEnabled &&
+                this.settings.currentGamedata.bonus.type == bonusGameType.tap
+            ) {
+                this.settings.bonus.game = new BonusGame(
+                    this.settings.currentGamedata.bonus.noOfItem,
+                    this
+                );
             }
             /*
-            MIDDLEWARE GOES HERE
-            */
+                  MIDDLEWARE GOES HERE
+                  */
             if (!this.settings.freeSpinStarted) {
                 await this.deductPlayerBalance(this.settings.currentBet);
             } else {
                 this.settings.freeSpinCount--;
                 if (this.settings.freeSpinCount <= 0) {
-                    this.settings.freeSpinStarted = false
-
+                    this.settings.freeSpinStarted = false;
                 }
             }
 
             this.settings.tempReels = [[]];
             this.settings.bonus.start = false;
-
+            this.player.totalbet += this.settings.currentBet
             new RandomResultGenerator(this);
-            const result = new CheckResult(this)
-            result.makeResultJson(ResultType.normal)
+            const result = new CheckResult(this);
+            result.makeResultJson(ResultType.normal);
         } catch (error) {
             console.error("Failed to generate spin results:", error);
             this.sendError("Spin error");
@@ -443,94 +485,81 @@ export default class SlotGame {
             for (let i = 0; i < spins; i++) {
                 this.spinResult();
                 spend += this.settings.currentBet;
-                won = this.settings._winData.totalWinningAmount
+                won = this.settings._winData.totalWinningAmount;
             }
             let rtp = 0;
-            console.log(`Bet:${this.settings.currentBet}\n,player total bet ${spend} and\n won ${won}`)
-
             if (spend > 0) {
-                rtp = (won / spend)
+                rtp = won / spend;
             }
-            console.log('BONUS :', this.settings.noOfBonus);
-            console.log('TOTAL BONUS : ', this.settings.totalBonuWinAmount);
-            console.log('GENERATED RTP : ', rtp)
+
+
+
+
             return
+
         } catch (error) {
             console.error("Failed to calculate RTP:", error);
             this.sendError("RTP calculation error");
         }
-        //    let count = 0;
-        //             const intervalId = setInterval(() => {
-        //                 this.spinResult()
-        //                 count++;
-
-        //                 // Stop after 500 calls
-        //                 if (count >= spins) {
-        //                     clearInterval(intervalId);
-        //                 }
-        //                 spend += this.settings.currentBet;
-        //                 won = this.settings._winData.totalWinningAmount
-        //             }, 1000);
     }
 
     public checkforMoolah() {
         try {
-            console.log("--------------------- CALLED FOR CHECK FOR MOOLAHHHH ---------------------");
             this.settings.tempReels = this.settings.reels;
 
             const lastWinData = this.settings._winData
-            console.log("TEMP WINDATA  : ", lastWinData);
+
 
             lastWinData.winningSymbols = this.combineUniqueSymbols(
                 this.removeRecurringIndexSymbols(lastWinData.winningSymbols)
             );
 
             const index = lastWinData.winningSymbols.map((str) => {
-                const index: { x, y } = str.split(",").map(Number);
+                const index: { x; y } = str.split(",").map(Number);
                 return index;
             });
-
-            console.log("Winning Indexes " + index);
 
             let matrix = [];
             matrix = this.settings.resultSymbolMatrix;
 
-            index.forEach(element => {
+            index.forEach((element) => {
                 matrix[element[1]][element[0]] = null;
-            })
+            });
 
             const movedArray = this.cascadeMoveTowardsNull(matrix);
 
             let transposed = this.transposeMatrix(movedArray);
-            let iconsToFill: number[][] = []
+            let iconsToFill: number[][] = [];
             for (let i = 0; i < transposed.length; i++) {
-                let row = []
+                let row = [];
                 for (let j = 0; j < transposed[i].length; j++) {
                     if (transposed[i][j] == null) {
-                        let index = (this.settings.resultReelIndex[i] + j + 2) % this.settings.tempReels[i].length;
+                        let index =
+                            (this.settings.resultReelIndex[i] + j + 2) %
+                            this.settings.tempReels[i].length;
                         transposed[i][j] = this.settings.tempReels[i][index];
                         row.unshift(this.settings.tempReels[i][index]);
                         this.settings.tempReels[i].splice(j, 1);
+                        this.settings.tempReels[i].splice(j, 1);
                     }
-
                 }
-                if (row.length > 0)
-                    iconsToFill.push(row);
+                if (row.length > 0) iconsToFill.push(row);
             }
-
 
             matrix = this.transposeMatrix(transposed);
             // matrix.pop();
             // matrix.pop();
             // matrix.pop();
+
             // matrix.push(['1', '2', '3', '4', '5'])
             // matrix.push(['1', '1', '1', '1', '6'])
             // matrix.push(['0', '0', '0', '0', '0'])
-            console.log("iconsTofill", iconsToFill);
-            this.settings.resultSymbolMatrix = matrix;
-            console.log("New Moola Matrix  : " + matrix);
 
-            console.log('icons to fill', iconsToFill)
+
+            this.settings.resultSymbolMatrix = matrix;
+
+
+
             // tempGame.
             const result = new CheckResult(this);
             result.makeResultJson(ResultType.moolah, iconsToFill);
@@ -541,7 +570,6 @@ export default class SlotGame {
             this.sendError("Moolah check error");
             return error
         }
-
     }
 
     private combineUniqueSymbols(symbolsToEmit: string[][]): string[] {
@@ -566,7 +594,7 @@ export default class SlotGame {
 
         symbolsToEmit.forEach((subArray) => {
             if (!Array.isArray(subArray)) {
-                console.warn('Expected an array but got', subArray);
+                console.warn("Expected an array but got", subArray);
                 return;
             }
             const uniqueSubArray: string[] = [];
@@ -584,12 +612,16 @@ export default class SlotGame {
         return result;
     }
 
-    private cascadeMoveTowardsNull(arr: (string | null)[][]): (string | null)[][] {
+    private cascadeMoveTowardsNull(
+        arr: (string | null)[][]
+    ): (string | null)[][] {
         if (arr.length === 0 || arr[0].length === 0) return arr;
         const numRows = arr.length;
         const numCols = arr[0].length;
 
-        let result: (string | null)[][] = Array.from({ length: numRows }, () => new Array(numCols).fill(null));
+        let result: (string | null)[][] = Array.from({ length: numRows }, () =>
+            new Array(numCols).fill(null)
+        );
 
         for (let col = 0; col < numCols; col++) {
             let newRow = numRows - 1;
@@ -623,8 +655,5 @@ export default class SlotGame {
         }
 
         return transposed;
-
     }
 }
-
-

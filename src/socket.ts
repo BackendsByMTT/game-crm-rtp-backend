@@ -89,7 +89,7 @@ const socketController = (io: Server) => {
 
             await existingUser.updateGameSocket(socket);
             existingUser.sendAlert(`Game socket created for ${username}`);
-            console.log(`Player ${username} started a new game.`);
+            
             return;
         }
 
@@ -97,9 +97,9 @@ const socketController = (io: Server) => {
         const newUser = new Player(username, decoded.role, decoded.credits, userAgent, socket);
         users.set(username, newUser);
         newUser.sendAlert(`Welcome, ${newUser.username}!`);
-        console.log(`Player ${newUser.username} entered the game.`);
+        
 
-        // console.log("After users : ", users);
+        // 
 
     });
 

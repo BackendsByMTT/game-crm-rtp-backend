@@ -290,7 +290,7 @@ export class CheckResult {
         return;
       } else if (
         payLine.line[i] !== specialIcons.any &&
-        s === payLine.line[i]
+        s === payLine.line[i] 
       ) {
         const symbolIndex = i.toString() + "," + lineData[i].toString();
         winSymbols.push(symbolIndex);

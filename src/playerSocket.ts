@@ -52,9 +52,7 @@ export class SocketUser {
 
             socket.emit("socketState", this.socketReady);
 
-            console.log(
-                `User ${this.username} initialized with socket ID: ${this.socketID}`
-            );
+            
         } catch (error) {
             console.error(`Error initializing user ${this.username}:`, error);
             if (socket.connected) {
@@ -117,7 +115,7 @@ export class SocketUser {
 
     public disconnectHandler() {
         this.socket.on("disconnect", (reason) => {
-            console.log(`User ${this.username} disconnected. Attempting to reconnect...`);
+            
 
             this.attemptReconnection();
         });
@@ -130,23 +128,23 @@ export class SocketUser {
                 this.reconnectionAttempts++;
 
                 if (this.socket && this.socket.connected) {
-                    console.log(`User ${this.username} reconnected successfully.`);
+                    
                     this.reconnectionAttempts = 0;
                     return;
                 }
 
-                console.log(`Reconnection attempt ${this.reconnectionAttempts} for user ${this.username}...`);
+                
             }
 
-            console.log(`User ${this.username} failed to reconnect after ${this.maxReconnectionAttempts} attempts.`);
+            
             users.delete(this.username);
             this.cleanup();
 
-            console.log("Curren tser : ", this.username);
+            
 
-            console.log("Map : ", users);
+            
         } catch (error) {
-            console.log("ERROR : Attempt to reconnect : ", error);
+            
         }
     }
 
@@ -172,7 +170,7 @@ export class SocketUser {
             users.delete(this.username)
             this.socket.disconnect();
             this.cleanup();
-            console.log("User exited");
+            
 
         })
     }
@@ -216,14 +214,14 @@ export default async function enterPlayer(socket: Socket) {
         if (existingUser) {
             await existingUser.updateSocket(socket);
             existingUser.sendAlert(`Welcome back, ${platformData.username}!`)
-            console.log(`Player ${platformData.username} re-entered the game.`);
+            
         }
         else {
             socket.data = { platformData, gameSetting };
             const newUser = new SocketUser(socket, platformData, gameSetting);
             users.set(platformData.username, newUser);
             newUser.sendAlert(`Welcome, ${platformData.username}!`);
-            console.log(`Player ${platformData.username} entered the game.`);
+            
         }
 
     } catch (error) {

@@ -48,11 +48,11 @@ export default class Player {
         this.onExit();
         socket.emit("socketState", true);
 
-        console.log(`User ${this.username} initialized with game socket ID: ${this.gameSocket.id}`);
+        
     }
 
     handleGameDisconnection() {
-        console.log(`User ${this.username} disconnected from game. Attempting to reconnect...`);
+        
         this.attemptReconnection();
     }
 
@@ -63,26 +63,26 @@ export default class Player {
                 this.reconnectionAttempts++;
 
                 if (this.cleanedUp) {
-                    console.log(`Reconnection halted for user ${this.username} as cleanup is done.`);
+                    
                     return;
                 }
 
                 if (this.gameSocket && this.gameSocket.connected) {
-                    console.log(`User ${this.username} reconnected successfully.`);
+                    
                     this.reconnectionAttempts = 0;
                     return;
                 }
 
-                console.log(`Reconnection attempt ${this.reconnectionAttempts} for user ${this.username}...`);
+                
             }
 
-            console.log(`User ${this.username} failed to reconnect after ${this.maxReconnectionAttempts} attempts.`);
+            
             users.delete(this.username);
             this.cleanup();
 
 
         } catch (error) {
-            console.log("ERROR: Attempt to reconnect:", error);
+            
         }
     }
 
@@ -124,8 +124,8 @@ export default class Player {
             this.gameSocket.on("EXIT", () => {
                 users.delete(this.username);
                 this.cleanup();
-                console.log("User exited");
-                console.log("USERS : ", users);
+                
+                
             });
         }
 
@@ -158,7 +158,7 @@ export default class Player {
                     { $project: { _id: 0, game: "$games" } },
                 ]);
 
-                console.log("Platform : ", platform);
+
 
 
                 // For Development only
@@ -169,7 +169,7 @@ export default class Player {
                 }
 
                 const game = platform[0].game;
-                console.log("game : ", game);
+                
 
                 const payout = await payoutController.getPayoutVersionData(game.tagName, game.payout)
 
