@@ -1,9 +1,12 @@
 {
   "dependencies": {
+    "@aws-sdk/client-sns": "^3.637.0",
+    "aws-sdk": "^2.1682.0",
     "bcrypt": "^5.1.1",
     "body-parser": "^1.20.2",
     "cloudinary": "^2.2.0",
     "cors": "^2.8.5",
+    "crypto": "^1.0.1",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-session": "^1.18.0",
@@ -32,8 +35,8 @@
     "typescript": "^5.4.5"
   },
   "scripts": {
-    "start": "node app.js",
-    "dev": "tsc-watch --onSuccess \"nodemon dist/app.js\"",
+    "start": "node dist/app.js",
+    "dev": "tsc-watch --onSuccess "nodemon dist/app.js"",
     "build": "tsc"
   }
 }
