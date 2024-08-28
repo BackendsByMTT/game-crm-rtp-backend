@@ -36,7 +36,7 @@
   },
   "scripts": {
     "start": "node dist/app.js",
-    "dev": "tsc-watch --onSuccess "nodemon dist/app.js"",
+    "dev": "tsc-watch --onSuccess \"nodemon dist/app.js\"",
     "build": "tsc"
   }
 }
