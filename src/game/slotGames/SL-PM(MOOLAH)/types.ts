@@ -26,12 +26,13 @@ export interface SLPMSETTINGS {
     cascadingResult: any[];
     lastReel: any[],
     tempReel: any[],
+    firstReel: any[],
     tempReelSym: any[],
+    freeSpinData: any[][],
     jackpot: {
         symbolName: string;
         symbolsCount: number;
         symbolId: number;
-        
         defaultAmount: number;
         increaseValue: number;
         useJackpot: boolean;
