@@ -245,7 +245,7 @@ export default class BaseSlotGame implements RequiredSocketMethods {
         this.settings.bonus.pay = symbol.pay;
         this.settings.bonus.useBonus = true;
         break;
-
+      
       default:
         break;
     }
