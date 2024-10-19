@@ -9,17 +9,38 @@ export class ToggleController {
     this.putToggle = this.putToggle.bind(this);
   }
 
-  async getToggle() {
+  //NOTE: GET toggle
+  async getToggle(req: Request, res: Response, next: NextFunction) {
     try {
-      const toggle = await Toggle.findOne();
-      return toggle;
+      const toggle = await Toggle.findOne({});
+      if(!toggle) throw createHttpError(404, "Toggle not found");
+      if(toggle.availableAt === null) {
+        res.status(200).json({ underMaintenance: false });
+        return
+      }
+
+      const now = new Date();
+      if(new Date(toggle.availableAt) < now) {
+        await Toggle.findOneAndUpdate(
+          {},
+          { availableAt: null },
+          { new: true, upsert: true }
+        )
+        res.status(200).json({ underMaintenance: false });
+        return
+      }else{
+        res.status(200).json({ underMaintenance: true,availableAt: toggle.availableAt });
+      }
     } catch (error) {
-      throw error
+      next(error);
     }
   }
+
+
   //NOTE: Add new toggle
   async putToggle(req: Request, res: Response, next: NextFunction) {
     try {
+
       const _req = req as AuthRequest;
       const { availableAt } = _req.body;
       if (!availableAt) throw createHttpError(404, "availableAt is required");
@@ -29,7 +50,7 @@ export class ToggleController {
           { availableAt: null },
           { new: true, upsert: true }
         );
-        res.status(200).json(toggle);
+        res.status(200).json({ message: "Toggle updated successfully", availableAt: toggle.availableAt });
         return
       }
       const now = new Date();
@@ -40,7 +61,7 @@ export class ToggleController {
         { availableAt },
         { new: true, upsert: true }
       );
-      res.status(200).json(toggle);
+      res.status(200).json({ message: "Toggle updated successfully", availableAt: toggle.availableAt });
 
     } catch (error) {
       next(error);

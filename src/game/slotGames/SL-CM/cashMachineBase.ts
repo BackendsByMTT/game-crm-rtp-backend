@@ -1,4 +1,3 @@
-import { WinData } from "../BaseSlotGame/WinData";
 import { CMSettings, SPECIALSYMBOLS, SPINTYPES } from "./types";
 import { initializeGameSettings, sendInitData, freezeIndex, checkSameMatrix, checkPayout, makeResultJson } from "./helper";
 import { currentGamedata } from "../../../Player";

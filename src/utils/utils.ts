@@ -15,6 +15,24 @@ const transactionController = new TransactionController()
 
 export const clients: Map<string, WebSocket> = new Map();
 
+export function formatDate(isoString: string): string {
+    const date = new Date(isoString);
+    const formattedDate = date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+    });
+
+    const formattedTime = date.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
+        hour12: true
+    });
+
+    return `${formattedDate} at ${formattedTime}`;
+}
+
 export const rolesHierarchy = {
   company: ["master", "distributor", "subdistributor", "store", "player"],
   master: ["distributor"],

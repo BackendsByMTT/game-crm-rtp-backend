@@ -3,7 +3,7 @@ import { extractRoleFromCookie, validateApiKey } from "../middleware/middlware";
 import { GameController } from "../../dashboard/games/gameController";
 import multer from "multer";
 import { checkUser } from "../middleware/checkUser";
-import { checkToggle } from "../middleware/checkToggle";
+import { checkGamesToggle } from "../middleware/checkToggle";
 
 const gameController = new GameController()
 const gameRoutes = express.Router();
@@ -11,7 +11,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 
 
 
 // GET : Get all Games
-gameRoutes.get("/", validateApiKey, checkUser,checkToggle, gameController.getGames);
+gameRoutes.get("/", validateApiKey, checkUser,checkGamesToggle, gameController.getGames);
 
 // POST : Add a Game
 gameRoutes.post('/', upload.fields([{ name: 'thumbnail' }, { name: 'payoutFile' }]), checkUser, gameController.addGame);
