@@ -7,7 +7,7 @@ interface Symbol {
     payout: number;
     reelInstance: { [key: string]: number };
 }
-export interface SLPMSETTINGS {
+export interface SLBESETTINGS {
     id: string;
     matrix: { x: number, y: number };
     currentGamedata: GameData;
@@ -20,22 +20,6 @@ export interface SLPMSETTINGS {
     bets: number[];
     reels: any[][];
     Symbols: Symbol[];
-    hasCascading: boolean,
-    cascadingNo: number,
-    payoutAfterCascading: number,
-    cascadingResult: any[];
-    lastReel: any[],
-    tempReel: any[],
-    tempReelSym: any[],
-    jackpot: {
-        symbolName: string;
-        symbolsCount: number;
-        symbolId: number;
-        
-        defaultAmount: number;
-        increaseValue: number;
-        useJackpot: boolean;
-    },
     freeSpin: {
         symbolID: string,
         freeSpinMuiltiplier: any[],

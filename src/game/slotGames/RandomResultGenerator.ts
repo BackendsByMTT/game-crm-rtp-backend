@@ -10,7 +10,6 @@ export class RandomResultGenerator {
             }
         }
         matrix.forEach(row => console.log(row.join(' ')));
-
         // matrix.pop();
         // matrix.pop();
         // matrix.pop();

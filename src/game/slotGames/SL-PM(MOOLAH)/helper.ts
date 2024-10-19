@@ -31,6 +31,7 @@ export function initializeGameSettings(gameData: any, gameInstance: SLPM) {
     reels: [],
     hasCascading: false,
     cascadingNo: 0,
+    payoutAfterCascading: 0,
     cascadingResult: [],
     lastReel: [],
     tempReel: [],
