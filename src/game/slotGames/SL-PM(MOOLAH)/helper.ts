@@ -37,7 +37,7 @@ export function initializeGameSettings(gameData: any, gameInstance: SLPM) {
     tempReel: [],
     firstReel: [],
     tempReelSym: [],
-    freeSpinData: [],
+    freeSpinData: gameData.gameSettings.freeSpinData,
     jackpot: {
       symbolName: "",
       symbolsCount: 0,
