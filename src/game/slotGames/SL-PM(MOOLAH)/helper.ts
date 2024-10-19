@@ -237,13 +237,15 @@ export function checkForWin(gameInstance: SLPM) {
           }
         }
         makeResultJson(gameInstance)
+        gameInstance.updatePlayerBalance(settings.payoutAfterCascading)
         settings.cascadingNo = 0;
         settings.hasCascading = false;
         settings.resultSymbolMatrix = [];
         settings.tempReelSym = [];
         settings.tempReel = [];
         settings.payoutAfterCascading = 0;
-        settings.cascadingResult = []
+        settings.cascadingResult=[]
+        
         break;
     }
     return winningLines;

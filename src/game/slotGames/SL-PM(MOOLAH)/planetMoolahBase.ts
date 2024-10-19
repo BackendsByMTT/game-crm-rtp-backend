@@ -2,6 +2,7 @@ import { currentGamedata } from "../../../Player";
 import { RandomResultGenerator } from "../RandomResultGenerator";
 import { initializeGameSettings, generateInitialReel, sendInitData, makePayLines, checkForWin } from "./helper";
 import { SLPMSETTINGS } from "./types";
+
 export class SLPM {
     public settings: SLPMSETTINGS;
     playerData = {
