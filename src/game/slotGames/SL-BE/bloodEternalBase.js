@@ -75,7 +75,7 @@ class SLBE {
                             result.currentWinning = this.playerData.currentWining;
                         }
                         else if (gambleOption === "HALF") {
-                            this.playerData.currentWining = parseFloat((this.playerData.currentWining * 1.5).toFixed(2));
+                            this.playerData.currentWining = (this.playerData.currentWining * 1.5);
                             result.currentWinning = this.playerData.currentWining;
                         }
                         // result.Balance = this.getPlayerData().credits + this.playerData.currentWining
@@ -87,7 +87,7 @@ class SLBE {
                             result.currentWinning = 0;
                         }
                         else if (gambleOption === "HALF") {
-                            this.playerData.currentWining = parseFloat((this.playerData.currentWining / 2).toFixed(2));
+                            this.playerData.currentWining = (this.playerData.currentWining / 2);
                             result.currentWinning = this.playerData.currentWining;
                         }
                         break;
@@ -128,6 +128,7 @@ class SLBE {
                 }
                 new RandomResultGenerator_1.RandomResultGenerator(this);
                 (0, helper_1.checkForWin)(this);
+                // this.gamebleTesting()
             }
             catch (error) {
                 this.sendError("Spin error");

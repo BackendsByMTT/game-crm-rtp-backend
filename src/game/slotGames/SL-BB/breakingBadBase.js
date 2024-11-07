@@ -24,7 +24,7 @@ class SLBB {
         this.settings = (0, helper_1.initializeGameSettings)(currentGameData, this);
         (0, helper_1.makePayLines)(this);
         (0, helper_1.generateInitialReel)(this.settings);
-        (0, helper_1.generateInitialHeisenberg)(this.settings);
+        (0, helper_1.generateInitialBonusReel)(this.settings);
         (0, helper_1.sendInitData)(this);
     }
     get initSymbols() {
