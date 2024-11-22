@@ -302,7 +302,6 @@ export default class PlayerSocket {
         { $project: { _id: 0, game: "$games" } },
       ]);
 
-
       if (platform.length === 0) {
         this.currentGameData.gameSettings = { ...gameData[0] };
         this.currentGameData.currentGameManager = new GameManager(this.currentGameData);

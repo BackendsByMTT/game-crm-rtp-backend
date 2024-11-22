@@ -54,6 +54,9 @@ export function checkForBonus(gameInstance: SLBB, hasCC: boolean, hasL: boolean,
     //TODO: also init bonus 
     // 1. set coins and cc to []
     // 2. freeze cc and swapped coins at link
+    if (hasML) {
+      settings.bonus.isMegaLink = true
+    }
 
     settings.cashCollect.values = []
 
@@ -97,6 +100,7 @@ export function handleBonusSpin(gameInstance: SLBB) {
   //      6. also check if all are filled 
   settings.bonus.isTriggered = false
   let isWalterStash = true
+  const coinType: "mega" | "coin" = settings.bonus.isMegaLink ? "mega" : "coin"
   //1. 2.
   new RandomBonusGenerator(gameInstance)
   //3.
@@ -114,10 +118,10 @@ export function handleBonusSpin(gameInstance: SLBB) {
       if (settings.bonusResultMatrix[i][j] == settings.link.SymbolID.toString() || settings.bonusResultMatrix[i][j] == settings.megalink.SymbolID.toString()) {
         settings.coins.bonusValues.push({
           index: [i, j],
-          value: getRandomValue(gameInstance, "coin")
+          value: getRandomValue(gameInstance, coinType)
         })
       }
-      if(settings.blanks.includes(settings.bonusResultMatrix[i][j].toString())){
+      if (settings.blanks.includes(settings.bonusResultMatrix[i][j].toString())) {
         isWalterStash = false
       }
     }
@@ -125,18 +129,20 @@ export function handleBonusSpin(gameInstance: SLBB) {
   //4.
   settings.bonus.count -= 1
   //5. 
-  getCoinsValues(gameInstance, "bonus")
+  getCoinsValues(gameInstance, coinType === "mega" ? "mega" : "bonus")
 
+
+  if (isWalterStash) {
+    settings.bonus.isWalterStash = true
+    settings.bonus.payout += settings.jackpot.payout[settings.jackpot.payout.length - 1] * settings.BetPerLines
+    settings.bonus.count = 0
+  }
   if (settings.bonus.count == 0) {
     const bonusPayout = handleCoinsAndCashCollect(gameInstance, "bonus")
-    settings.bonus.payout = bonusPayout
-  }
-  if(isWalterStash){
-    settings.bonus.isWalterStash = true
-    settings.bonus.payout+=settings.jackpot.payout[0]
+    settings.bonus.payout += bonusPayout
   }
 
 
-  
+
 
 }

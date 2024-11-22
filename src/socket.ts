@@ -58,7 +58,6 @@ const getManagerDetails = async (username: string) => {
 const handlePlayerConnection = async (socket: Socket, decoded: DecodedToken, userAgent: string) => {
     const username = decoded.username;
     const platformId = socket.handshake.auth.platformId;
-
     const origin = socket.handshake.auth.origin;
     const gameId = socket.handshake.auth.gameId;
     const { credits, status, managerName } = await getPlayerDetails(username);
@@ -90,7 +89,7 @@ const handlePlayerConnection = async (socket: Socket, decoded: DecodedToken, use
 
 
         // Game connection handling
-        if (gameId) {
+        if (gameId || !gameId) {
             if (!existingPlayer.platformData.socket || !existingPlayer.platformData.socket.connected) {
                 console.log("Platform connection required before joining a game.");
                 socket.emit(messageType.ERROR, "Platform connection required before joining a game.");

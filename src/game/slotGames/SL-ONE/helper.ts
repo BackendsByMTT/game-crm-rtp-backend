@@ -445,6 +445,8 @@ function applyScatterPurple(gameInstance: SLONE, symbol: Symbol, response: Scatt
     let levelUpResult: LevelUpResult = { level: 0, isLevelUp: false };
     let boosterResult: BoosterResult = { type: 'NONE', multipliers: [] };
 
+
+    response.symbols.push(sym.Id)
     switch (feature) {
       case 1:
         // console.log("Level-up feature triggered");
@@ -485,7 +487,6 @@ function applyScatterPurple(gameInstance: SLONE, symbol: Symbol, response: Scatt
       // console.log("No feature triggered.");
     }
 
-    response.symbols.push(sym.Id)
 
     //NOTE: match with topSymbols
     if (topSymbols.includes(sym.Id)) {
@@ -837,10 +838,10 @@ export function makeResultJson(gameInstance: SLONE) {
 
     gameInstance.sendMessage('ResultData', sendData);
     console.log("ResultData sent");
-    console.log(sendData);
+    console.log(JSON.stringify(sendData, null, 2));
     // console.log("levlup resp", sendData.GameData.levelup);
     // console.log("booster resp", sendData.GameData.booster);
-    console.log("scatter resp", sendData.GameData.freeSpinResponse);
+    // console.log("scatter resp", sendData.GameData.freeSpinResponse);
     // console.log("joker resp", sendData.GameData.jokerResponse);
 
   } catch (error) {

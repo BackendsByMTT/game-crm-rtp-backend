@@ -23,31 +23,32 @@ export interface SLTMSETTINGS {
   isEnabled: boolean;
   bets: number[];
   Symbols: SymbolType[];
-  resultSymbolMatrix: any [][];
+  resultSymbolMatrix: any[][];
   currentGamedata: any;
   _winData: any;
   currentBet: number;
   currentLines: number;
   BetPerLines: number;
   reels: number[][];
-  freeSpinReels:number[][];
+  // freeSpinReels: number[][];
   minMatchCount: number;
-  level:0|1|2|3|4;
-  isLevelUp:boolean;
+  level: 0 | 1 | 2 | 3 | 4;
+  isLevelUp: boolean;
   isFreeSpin: boolean;
-  isFreeSpinTriggered:boolean;
+  isFreeSpinTriggered: boolean;
   freeSpinCount: number;
+  freeSpinIncrement: number;
+  freeSpinRetriggerProbs: number[];
   // freeSpinSymbolId: number;
   // freeSpinMultipliers: number[];
-  // freeSpinIncrement: number;
   // maxMultiplier: number;
   winningCombinations: WinningCombination[]
-  wild:{
-    SymbolId:  string;
+  wild: {
+    SymbolId: string;
     SymbolName: string
   },
-  freeSpin:{
-    SymbolId:  string;
+  freeSpin: {
+    SymbolId: string;
     SymbolName: string
   }
 }
