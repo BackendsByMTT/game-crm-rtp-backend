@@ -37,6 +37,8 @@ export class RandomBonusGenerator {
 
         matrix.forEach((row) => console.log(row.join(" ")));
         current.settings.bonusResultMatrix = matrix;
+        console.log(matrix, "ddd");
+        
     }
 
     getRandomIndex(maxValue: number): number {
@@ -56,14 +58,15 @@ export function handleBonusGameSpin(gameInstance: SLPB) {
     new RandomBonusGenerator(gameInstance);
     const { settings } = gameInstance;
     // handle bonus symbol occurrences in the bonus game
-    // checkOcurrenceOfSymbols(gameInstance);
+    checkOcurrenceOfSymbols(gameInstance);
     // add the grand prize if applicable
     if (settings.isGrandPrize) {
-        const payoutOfBonusGame = calculatePayoutOfBonusGame(gameInstance);
-        settings.freeSpin.freeSpinPayout = payoutOfBonusGame;
-        settings.freeSpin.freeSpinCount = 0;
-        settings.freeSpin.useFreeSpin = false;
-        settings.freeSpin.freeSpinsAdded = false;
+        const payoutOfBonusGame = calculatePayoutOfBonusGame(gameInstance);        
+        settings.thunderBonus.thunderSpinPayout = payoutOfBonusGame;
+        settings.thunderBonus.thunderSpinCount = 0;
+        settings.thunderBonus.isThunderBonus = false;
+        settings.thunderBonus.thunderSpinsAdded = false;
+        gameInstance.playerData.currentWining += payoutOfBonusGame;     
     }
 
 }
@@ -76,125 +79,86 @@ export function handleBonusGameSpin(gameInstance: SLPB) {
  * @param gameInstance - The instance of the SLPB class that manages the game logic.
  */
 
-// function checkOcurrenceOfSymbols(gameInstance: SLPB) {
-//     const { settings } = gameInstance;
+function checkOcurrenceOfSymbols(gameInstance: SLPB) {
+    const { settings } = gameInstance;
 
-//     //Ids of symbols to freeze, excluding placeholders
-//     const symbolsToFridge = gameInstance.settings.BonusSymbols.filter((value) => value.Name !== "PlaceHolder").map((symbol) => symbol.Id)
-//     // console.log(symbolsToFridge, "SYMBOL TO FRIDGE");
-//     //already frozen positions
-//     const frozenPositions = settings.frozenIndices.map(
-//         (frozenIndex) => `${frozenIndex.position[0]},${frozenIndex.position[1]}`
-//     );
-//     //to track the length and rewared freespin
-//     const tempFrozenIndicesLength = settings.frozenIndices.length;
-//     // console.log(tempFrozenIndicesLength, "frozenInidcesLength");
+    //Ids of symbols to freeze, excluding placeholders
+    const symbolsToFridge = gameInstance.settings.BonusSymbols.filter((value) => value.Name !== "Placeholder").map((symbol) => symbol.Id)
+    // console.log(symbolsToFridge, "SYMBOL TO FRIDGE");
+    //already frozen positions
+    const frozenPositions = settings.frozenIndices.map(
+        (frozenIndex) => `${frozenIndex.position[0]},${frozenIndex.position[1]}`
+    );    
+    //to track the length and rewared freespin
+    const tempFrozenIndicesLength = settings.frozenIndices.length;
+    console.log(tempFrozenIndicesLength, "frozenInidcesLength");
 
 
-//     settings.bonusResultMatrix.forEach((row, rowIndex) => {
-//         row.forEach((symbol, colIndex) => {
-//             symbolsToFridge.forEach((symbolID) => {
-//                 if (symbol == symbolID) {
-//                     const positionKey = `${colIndex},${rowIndex}`;
-//                     if (!frozenPositions.includes(positionKey)) {
-//                         // console.log(positionKey, "position key to freeze");
+    settings.bonusResultMatrix.forEach((row, rowIndex) => {
+        row.forEach((symbol, colIndex) => {
+            symbolsToFridge.forEach((symbolID) => {
+                if (symbol == symbolID) {                    
+                    const positionKey = `${colIndex},${rowIndex}`;
+                    if (!frozenPositions.includes(positionKey)) {
+                        console.log(positionKey, "position key to freeze");
+                       console.log(symbol, settings.coins.SymbolID);
+                       
+                        let coinsvalue = 0;
+                        switch (true) {
+                            case symbol == settings.coins.SymbolID:
+                                if(settings.freeSpin.useFreeSpin){
+                                    coinsvalue = getRandomValue(gameInstance, 'coinsValueDuringFreeSpin');
+                                   }else{
+                                     coinsvalue = getRandomValue(gameInstance, 'coinsValue');
+                                   }                                
+                                   break;
+                            case symbol == settings.mini.SymbolID:
+                                coinsvalue = settings.miniMultiplier;
+                                break;
 
-//                         let prizeValue = 0;
-//                         let transformedSymbol;
-//                         switch (true) {
-//                             case symbol == settings.bonus.SymbolID:
-//                                 prizeValue = getRandomValue(gameInstance, 'prize')
-//                                 break;
+                            case symbol == settings.major.SymbolID:
+                                coinsvalue = settings.majorMultiplier;
+                                break;
 
-//                             case symbol == settings.mystery.SymbolID:
-//                                 transformedSymbol = getRandomValue(gameInstance, 'mystery')
-//                                 switch (true) {
-//                                     case transformedSymbol == settings.bonus.SymbolID:
-//                                         prizeValue = getRandomValue(gameInstance, 'prize');
-//                                         break;
-//                                     case transformedSymbol == settings.mini.SymbolID:
-//                                         prizeValue = settings.miniMultiplier;
-//                                         break;
-//                                     case transformedSymbol == settings.minor.SymbolID:
-//                                         prizeValue = settings.minorMultiplier;
-//                                         break;
-//                                     case transformedSymbol == settings.major.SymbolID:
-//                                         prizeValue = settings.majorMultiplier;
-//                                         break;
-//                                     default:
-//                                         break;
-//                                 }
+                            case symbol == settings.mega.SymbolID:
+                                coinsvalue = settings.megaMultiplier;
+                                break;
 
-//                                 settings.moonMysteryData.push({ position: [colIndex, rowIndex], prizeValue: prizeValue, symbol: transformedSymbol })
-//                                 break;
+                            default:
+                                // console.log("UNKNOWN SYMBOL", symbol);
+                                break;
+                        }
 
-//                             case symbol == settings.moonMystery.SymbolID:
-//                                 transformedSymbol = getRandomValue(gameInstance, 'moonMystery')
-//                                 switch (true) {
-//                                     case transformedSymbol == settings.bonus.SymbolID:
-//                                         prizeValue = getRandomValue(gameInstance, 'prize');
-//                                         break;
-//                                     case transformedSymbol == settings.mini.SymbolID:
-//                                         prizeValue = settings.miniMultiplier;
-//                                         break;
-//                                     case transformedSymbol == settings.minor.SymbolID:
-//                                         prizeValue = settings.minorMultiplier;
-//                                         break;
-//                                     case transformedSymbol == settings.major.SymbolID:
-//                                         prizeValue = settings.majorMultiplier;
-//                                         break;
-//                                     case transformedSymbol == settings.moon.SymbolID:
-//                                         settings.isMoonJackpot = true;
-//                                         prizeValue = settings.moonMultiplier;
-//                                         break;
-//                                     default:
-//                                         break;
-//                                 }
-//                                 settings.moonMysteryData.push({ position: [colIndex, rowIndex], prizeValue: prizeValue, symbol: transformedSymbol })
-//                                 break;
+                        // Add to frozenIndices
+                        settings.frozenIndices.push({
+                            position: [colIndex, rowIndex],
+                            coinsvalue: coinsvalue,
+                            symbol: symbol
+                        });
 
-//                             case symbol == settings.mini.SymbolID:
-//                                 prizeValue = settings.miniMultiplier;
-//                                 break;
+                        frozenPositions.push(positionKey);
+                    }
+                }
+            })
+        })
+    })
 
-//                             case symbol == settings.minor.SymbolID:
-//                                 prizeValue = settings.minorMultiplier;
-//                                 break;
-
-//                             case symbol == settings.major.SymbolID:
-//                                 prizeValue = settings.majorMultiplier;
-//                                 break;
-
-//                             default:
-//                                 // console.log("UNKNOWN SYMBOL", symbol);
-//                                 break;
-//                         }
-
-//                         // Add to frozenIndices
-//                         settings.frozenIndices.push({
-//                             position: [colIndex, rowIndex],
-//                             prizeValue: prizeValue,
-//                             symbol: symbol
-//                         });
-
-//                         frozenPositions.push(positionKey);
-//                     }
-//                 }
-//             })
-//         })
-//     })
-
-//     if (settings.frozenIndices.length === 16) {
-//         // console.log("JACKPOT");
-//         settings.isGrandPrize = true;
-//     }
-//     if (settings.frozenIndices.length > tempFrozenIndicesLength) {
-//         if (settings.freeSpin.useFreeSpin === true) {
-//             settings.freeSpin.freeSpinsAdded = true;
-//             settings.freeSpin.freeSpinCount = settings.freeSpin.freeSpinAwarded;
-//         }
-//     }
-// }
+    if (settings.frozenIndices.length === 15) {
+        console.log("JACKPOT");
+        settings.isGrandPrize = true;
+    }
+    if(settings.isGrandPrize){
+      
+    }
+    console.log(settings.frozenIndices.length);
+    
+    if (settings.frozenIndices.length > tempFrozenIndicesLength) {
+        if (settings.thunderBonus.isThunderBonus === true) {
+            settings.thunderBonus.thunderSpinsAdded = true;
+            settings.thunderBonus.thunderSpinCount = settings.thunderBonus.thunderSpinAwardedCount;
+        }
+    }
+}
 
 /**
  * Calculates the total payout for the bonus game based on various conditions.
@@ -210,31 +174,20 @@ export function handleBonusGameSpin(gameInstance: SLPB) {
 export function calculatePayoutOfBonusGame(gameInstance: SLPB) {
     const { settings } = gameInstance;
     let totalPayout = 0;
-    //handle moon jackpot
-    //return i fmoon jackpot(max winning is moon jackpot)
-    if (settings.isMoonJackpot) {
-        // console.log("MOON JACKPOT");
-        gameInstance.playerData.currentWining = 0
-        settings.freeSpin.useFreeSpin = false;
-        settings.freeSpin.freeSpinCount = 0;
-        settings.freeSpin.freeSpinsAdded = false;
-        const payout = settings.moonMultiplier * settings.currentBet;
-        totalPayout = payout;
-        return totalPayout;
-    }
+  
     //handle grand prize
-    if ((settings.isGrandPrize) && (!settings.isMoonJackpot)) {
+    if ((settings.isGrandPrize)) {
         const payout = settings.grandMultiplier * settings.currentBet;
         totalPayout += payout;
     }
 
     //payout from frozen indices
     const frozenIndicesPayout = settings.frozenIndices.reduce((accumulator, frozenIndex) => {
-        const prizeValue = frozenIndex.prizeValue || 0;
-        return accumulator + prizeValue * settings.currentBet;
+        const coinsvalue = frozenIndex.coinsvalue || 0;
+        return accumulator + coinsvalue * settings.currentBet;
     }, 0);
 
-    totalPayout += frozenIndicesPayout;
+    totalPayout += frozenIndicesPayout;    
     return totalPayout;
 
 }

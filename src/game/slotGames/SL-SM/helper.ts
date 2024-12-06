@@ -295,6 +295,7 @@ export function checkForWin(gameInstance: SLSM) {
                     settings.freeSpin.freeSpinPayout = payoutOfBonusGame;
                     settings.freeSpin.useFreeSpin = false;
                     settings.frozenIndices = [];
+                    return;
                 }
             }
             handleBonusGameSpin(gameInstance);
@@ -319,6 +320,7 @@ export function checkForWin(gameInstance: SLSM) {
         settings._winData.winningSymbols = []
         settings.freeSpin.freeSpinsAdded = false;
         gameInstance.settings.bonusSymbolValue = []
+        settings.isGrandPrize = false;
     } catch (error) {
         console.error("Error in checkForWin", error);
         return [];

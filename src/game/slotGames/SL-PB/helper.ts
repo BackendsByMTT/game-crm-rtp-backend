@@ -35,29 +35,37 @@ export function initializeGameSettings(gameData: any, gameInstance: SLPB) {
         BetPerLines: 0,
         reels: [],
         bonusReels: [],
-        stickySymbolCount: gameData.gameSettings.stickyBonusCount,
-        stickySymbolCountProb: gameData.gameSettings.stickySymbolCountProb,
-        prizeValue: gameData.gameSettings.prizeValue,
-        prizeValueProb: gameData.gameSettings.prizeValueProb,
-        mysteryValues: gameData.gameSettings.mysteryValues,
-        mysteryValueProb: gameData.gameSettings.mysteryValueProb,
-        moonMysteryValues: gameData.gameSettings.moonMysteryValues,
-        moonMysteryValueProb: gameData.gameSettings.moonMysteryValueProb,
+        pollyAdjacentColumn: gameData.gameSettings.pollyAdjacentColumn,
+        pollyAdjacentColumnProb: gameData.gameSettings.pollyAdjacentColumnProb,
+        coinsvalue: gameData.gameSettings.coinsvalue,
+        coinsvalueProb: gameData.gameSettings.coinsvalueProb,
+        coinsvalueDuringFreeSpins:gameData.gameSettings.coinsvalueDuringFreeSpins,
+        coinsvalueDuringFreeSpinsProb:gameData.gameSettings.coinsvalueDuringFreeSpinsProb,
+        pollyAdjacentSymbol: gameData.gameSettings.pollyAdjacentSymbol,
+        pollyAdjacentSymbolProb: gameData.gameSettings.pollyAdjacentSymbolProb,
+        colossalMergeProbability: gameData.gameSettings.colossalMergeProbability,
+        tommyColossalSymbol:gameData.gameSettings.tommyColossalSymbol,
+        tommyColossalSymbolProb:gameData.gameSettings.tommyColossalSymbolProb,
         bonusSymbolValue: [],
         frozenIndices: [],
         miniMultiplier: gameData.gameSettings.miniMultiplier,
-        minorMultiplier: gameData.gameSettings.minorMultiplier,
+        megaMultiplier: gameData.gameSettings.megaMultiplier,
         majorMultiplier: gameData.gameSettings.majorMultiplier,
         grandMultiplier: gameData.gameSettings.grandMultiplier,
-        moonMultiplier: gameData.gameSettings.moonMultiplier,
-        moonMysteryData: [],
-        isMoonJackpot: false,
-        isStickyBonusSymbol: false,
         isGrandPrize: false,
-        isStickyBonus: false,
+        isArthurBonus: false,
+        isTomBonus:false,
+        isPollyBonus:false,
+        thunderBonus: {
+            thunderSpinCount: 0,
+            thunderSpinAwardedCount: gameData.gameSettings.bonus.thunderIncrementCount,
+            isThunderBonus: false,
+            thunderSpinsAdded: false,
+            thunderSpinPayout:0
+        },
         freeSpin: {
             freeSpinsAdded: false,
-            freeSpinAwarded: gameData.gameSettings.freeSpinCount,
+            freeSpinAwardedCount: gameData.gameSettings.bonus.incrementCount,
             freeSpinCount: 0,
             useFreeSpin: false,
             freeSpinPayout: 0
@@ -126,7 +134,7 @@ export function initializeGameSettings(gameData: any, gameInstance: SLPB) {
 export function generateInitialReel(gameSettings: any): string[][] {
     const reels = [[], [], [], [], [], [], []];
     gameSettings.Symbols.forEach((symbol) => {
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 5; i++) {
             const count = symbol.reelInstance[i] || 0;
             for (let j = 0; j < count; j++) {
                 reels[i].push(symbol.Id);
@@ -148,7 +156,7 @@ export function generateInitialReel(gameSettings: any): string[][] {
 export function generateInitialBonusReel(gameSettings: any): string[][] {
     const reels = [[], [], [], [], [], [], []];
     gameSettings.BonusSymbols.forEach((symbol) => {
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 5; i++) {
             const count = symbol.reelInstance[i] || 0;
             for (let j = 0; j < count; j++) {
                 reels[i].push(symbol.Id);
@@ -200,10 +208,9 @@ function getMultipliersForBonusSymbols(gameInstance: SLPB) {
     const { settings } = gameInstance;
     const multipliers = [
         { name: "Mini Multiplier", value: settings.miniMultiplier },
-        { name: "Minor Multiplier", value: settings.minorMultiplier },
+        { name: "Mega Multiplier", value: settings.megaMultiplier },
         { name: "Major Multiplier", value: settings.majorMultiplier },
         { name: "Grand Multiplier", value: settings.grandMultiplier },
-        { name: "Moon Multiplier", value: settings.moonMultiplier },
     ];
 
     return multipliers;
@@ -283,20 +290,56 @@ export function checkForWin(gameInstance: SLPB) {
     try {
       const { settings } = gameInstance;
       const winningLines = [];
-  
-      settings.lineData.forEach((line, index) => {
+      let totalPayout = 0;
+
+      if(settings.thunderBonus.isThunderBonus){
+        if (settings.thunderBonus.isThunderBonus && settings.thunderBonus.thunderSpinCount> 0) {
+            settings.thunderBonus.thunderSpinCount -= 1;
+            if (settings.thunderBonus.thunderSpinCount <= 0) {                
+                const payoutOfBonusGame = calculatePayoutOfBonusGame(gameInstance);
+                console.log(payoutOfBonusGame, "Payout of bonus games");
+                settings.thunderBonus.thunderSpinPayout = payoutOfBonusGame;
+                settings.thunderBonus.isThunderBonus = false;
+                settings.frozenIndices = [];
+                return;
+            }
+        }
+        handleBonusGameSpin(gameInstance);
+      }else{
+    checkForThunderBonusGame(gameInstance);
+      if(settings.freeSpin.useFreeSpin){
+        switch(true){
+            case settings.isArthurBonus:
+                handleArthurBonus(gameInstance)
+                  break;
+            case settings.isPollyBonus:
+                handlePollyBonus(gameInstance)
+                  break;
+            case settings.isTomBonus:
+                handleTomBonus(gameInstance)
+                  break;
+            default:
+                  break;                            
+            
+        }
+      }else{
+        checkForFreeSpin(gameInstance);
+      }
+
+
+      settings.lineData.forEach((line, index) => {        
         const firstSymbolPosition = line[0];
         let firstSymbol = settings.resultSymbolMatrix[firstSymbolPosition][0];
-        let totalPayout = 0;
         if (settings.wild.useWild && firstSymbol === settings.wild.SymbolID) {
           firstSymbol = findFirstNonWildSymbol(line, gameInstance);
         }
   
         const { isWinningLine, matchCount, matchedIndices: winMatchedIndices } = checkLineSymbols(firstSymbol, line, gameInstance);
   
-        if ((isWinningLine && matchCount >= 3)) {
+        if ((isWinningLine && matchCount >= 3)) {         
+
           const symbolMultiplier = accessData(firstSymbol, matchCount, gameInstance);
-  
+            
           if (symbolMultiplier > 0 ) {
             totalPayout += symbolMultiplier * gameInstance.settings.BetPerLines;
             gameInstance.playerData.currentWining += totalPayout;
@@ -320,9 +363,10 @@ export function checkForWin(gameInstance: SLPB) {
         }
       });
   
-   
+      }
   
- 
+      totalPayout += settings.thunderBonus.thunderSpinPayout;
+
       console.log("Total Winning", gameInstance.playerData.currentWining);
       console.log("Total Free Spins Won:", gameInstance.settings.freeSpin.freeSpinCount);
   
@@ -334,6 +378,13 @@ export function checkForWin(gameInstance: SLPB) {
       gameInstance.playerData.currentWining = 0;
       gameInstance.settings._winData.winningLines = [];
       gameInstance.settings._winData.winningSymbols = [];
+      settings.freeSpin.freeSpinsAdded = false;
+      gameInstance.settings.bonusSymbolValue = []
+      settings.freeSpin.freeSpinPayout = 0;
+      settings.thunderBonus.thunderSpinsAdded = false;
+      settings.thunderBonus.thunderSpinPayout = 0;
+      settings.isGrandPrize = false;
+
     } catch (error) {
       console.error("Error in checkForWin", error);
       return [];
@@ -385,7 +436,7 @@ function checkLineSymbols(
         } else {
           break;
         }
-      }
+      }      
         return { isWinningLine: matchCount >= 3, matchCount, matchedIndices };
     } catch (error) {
       console.error("Error in checkLineSymbols:", error);
@@ -411,8 +462,8 @@ function accessData(symbol, matchCount, gameInstance: SLPB) {
         );
         if (symbolData) {
             const multiplierArray = symbolData.multiplier;
-            if (multiplierArray && multiplierArray[16 - matchCount]) {
-                return multiplierArray[16 - matchCount][0];
+            if (multiplierArray && multiplierArray[5 - matchCount]) {
+                return multiplierArray[5 - matchCount][0];
             }
         }
         return 0;
@@ -499,25 +550,30 @@ function handleSpecialSymbols(symbol: any, gameInstance: SLPB) {
  * @throws An error if an invalid type is provided.
  */
 
-export function getRandomValue(gameInstance: SLPB, type: 'sticky' | 'prize' | 'mystery' | 'moonMystery'): number {
+export function getRandomValue(gameInstance: SLPB, type: 'polly' | 'coinsValue' | 'pollySymbol'| 'tomCollosal' | 'coinsValueDuringFreeSpin'): number {
     const { settings } = gameInstance;
 
     let values: number[];
     let probabilities: number[];
     
     // determine the values and probabilities based on the type
-    if (type === 'sticky') {
-        values = settings?.stickySymbolCount;
-        probabilities = settings?.stickySymbolCountProb;
-    } else if (type === 'prize') {
-        values = settings?.prizeValue;
-        probabilities = settings?.prizeValueProb;
-    } else if (type === 'mystery') {
-        values = settings?.mysteryValues;
-        probabilities = settings?.mysteryValueProb;
-    } else if (type === 'moonMystery') {
-        values = settings?.moonMysteryValues;
-        probabilities = settings?.moonMysteryValueProb;
+    if (type === 'polly') {
+        values = settings?.pollyAdjacentColumn;
+        probabilities = settings?.pollyAdjacentColumn
+    } else if (type === 'coinsValue') {
+        values = settings?.coinsvalue;
+        probabilities = settings?.coinsvalueProb;
+    } else if (type === 'coinsValueDuringFreeSpin') {
+        values = settings?.coinsvalueDuringFreeSpins;
+        probabilities = settings?.coinsvalueDuringFreeSpinsProb;
+    }
+     else if (type === 'pollySymbol') {
+        values = settings?.pollyAdjacentColumn;
+        probabilities = settings?.pollyAdjacentColumnProb;
+    }
+    else if (type === 'tomCollosal') {
+        values = settings?.tommyColossalSymbol;
+        probabilities = settings?.tommyColossalSymbolProb;
     }
     else {
         throw new Error("Invalid type, expected 'coin' or 'freespin'");
@@ -542,6 +598,51 @@ export function getRandomValue(gameInstance: SLPB, type: 'sticky' | 'prize' | 'm
 
 
 /**
+ * Returns true or false based on a given probability.
+ * @param probability - The probability (in percentage) for the event to occur (0 to 100).
+ * @returns `true` if the event occurs, otherwise `false`.
+ */
+export function checkProbability(probability: number): boolean {
+    if (probability < 0 || probability > 100) {
+        throw new Error("Probability must be between 0 and 100.");
+    }
+
+    const randomValue = Math.random() * 100; // Random value between 0 and 100
+    return randomValue < probability;
+}
+
+
+
+function checkForThunderBonusGame(gameInstance:SLPB){
+    const { settings } = gameInstance;
+    let coinCount = 0; 
+    settings.frozenIndices = [];
+    settings.resultSymbolMatrix.map((row, rowIndex)=>{
+        row.map((symbol, colIndex)=>{
+            if(symbol === settings.coins.SymbolID){
+                let bonusSymbolValue;
+                if(settings.freeSpin.useFreeSpin){
+                 bonusSymbolValue = getRandomValue(gameInstance, 'coinsValueDuringFreeSpin');
+                }else{
+                    bonusSymbolValue = getRandomValue(gameInstance, 'coinsValue');
+                }
+                gameInstance.settings.bonusSymbolValue.push({ position: [colIndex, rowIndex], coinsvalue: bonusSymbolValue, symbol: symbol })  
+               coinCount++;
+            }
+        })
+    })
+
+    if(coinCount>= 6){
+        gameInstance.settings.tempResultSymbolMatrix = settings.resultSymbolMatrix
+   
+     settings.thunderBonus.isThunderBonus = true;
+     settings.thunderBonus.thunderSpinCount = settings.thunderBonus.thunderSpinAwardedCount;
+     gameInstance.settings.frozenIndices = gameInstance.settings.bonusSymbolValue;
+    }
+}
+
+
+/**
  * Checks if free spins are triggered based on the occurrence of bonus symbols in the result symbol matrix.
  * Updates the game settings with bonus symbol values and manages the sticky bonus logic for free spins.
  * 
@@ -550,14 +651,147 @@ export function getRandomValue(gameInstance: SLPB, type: 'sticky' | 'prize' | 'm
  */
 
 function checkForFreeSpin(gameInstance: SLPB) {
-    const { resultSymbolMatrix, bonus, freeSpin } = gameInstance.settings;
-    // reset frozen indices and count bonus symbols
-    gameInstance.settings.frozenIndices = [];
-    let bonusSymbolCount = 0
-    const isFreeSpin = 0;
-    return { isFreeSpin, bonusSymbolCount };
+    const { resultSymbolMatrix, bonus, arthurBonus, pollyBonus, tomBonus } = gameInstance.settings;
+    const { settings } = gameInstance;
+    // Reset frozen indices
+    const mandatoryBonusID = bonus.SymbolID;
+    const column5BonusIDs = [arthurBonus.SymbolID, pollyBonus.SymbolID, tomBonus.SymbolID];
+    const isBonusInColumn1 = resultSymbolMatrix.some(row => row[0] === mandatoryBonusID);    
+    const isBonusInColumn3 = resultSymbolMatrix.some(row => row[2] === mandatoryBonusID);
+
+    if (isBonusInColumn1 && isBonusInColumn3) {
+        const column5BonusID = resultSymbolMatrix.find(row => column5BonusIDs.includes(row[4]))?.[4];
+        console.log(column5BonusID, "SS");
+        
+        if(column5BonusID){
+            settings.freeSpin.useFreeSpin = true;    
+        settings.freeSpin.freeSpinCount = settings.freeSpin.freeSpinAwardedCount;
+        }
+        switch (column5BonusID) {
+            case arthurBonus.SymbolID:
+                console.log("arthur");
+                
+                settings.isArthurBonus = true;
+                break;
+
+            case tomBonus.SymbolID:
+                console.log("tom");
+
+                settings.isTomBonus = true;
+                break;
+
+            case pollyBonus.SymbolID:
+                console.log("polly");
+
+                settings.isPollyBonus = true;
+                break;
+
+            default:
+                break;
+        }
+    } else {
+        console.log("Columns 1 and 3 do not both contain bonus ID 10. No further checks performed.");
+    }
 }
 
+function handleArthurBonus(gameInstance:SLPB){
+     const { settings } = gameInstance;
+     if(settings.freeSpin.freeSpinCount>0 && settings.freeSpin.useFreeSpin){
+        settings.freeSpin.freeSpinCount -= 1;
+        if (settings.freeSpin.freeSpinCount <= 0) {
+            settings.freeSpin.useFreeSpin = false;
+            settings.isArthurBonus = false;
+        }
+     }
+
+     reducedMatrixForArthurBonus(gameInstance);
+     checkBonusSymbolCount(gameInstance);
+
+}
+
+function handlePollyBonus(gameInstance:SLPB){
+    const { settings } = gameInstance;
+    if(settings.freeSpin.freeSpinCount>0 && settings.freeSpin.useFreeSpin){
+       settings.freeSpin.freeSpinCount -= 1;
+       if (settings.freeSpin.freeSpinCount <= 0) {
+           settings.freeSpin.useFreeSpin = false;
+           settings.isPollyBonus = false;
+       }
+    }
+
+    const pollyAdjacentColumn = getRandomValue(gameInstance, 'polly');
+
+    settings.resultSymbolMatrix.map((row, rowIndex)=>{
+        
+        row[pollyAdjacentColumn] = getRandomValue(gameInstance, 'pollySymbol');
+        row.fill(row[pollyAdjacentColumn], pollyAdjacentColumn + 1, pollyAdjacentColumn + 3);
+
+        console.log(row[pollyAdjacentColumn]);
+
+    })
+    checkBonusSymbolCount(gameInstance);
+}
+
+function handleTomBonus(gameInstance:SLPB){
+    const { settings } = gameInstance;
+    if(settings.freeSpin.freeSpinCount>0 && settings.freeSpin.useFreeSpin){
+       settings.freeSpin.freeSpinCount -= 1;
+       if (settings.freeSpin.freeSpinCount <= 0) {
+           settings.freeSpin.useFreeSpin = false;
+           settings.isTomBonus = false;
+       }
+    }
+
+    if (checkProbability(settings.colossalMergeProbability)) {
+        const randomValue = getRandomValue(gameInstance, 'tomCollosal');
+    
+        settings.resultSymbolMatrix.forEach((row) => {
+            row.fill(randomValue, 1, 4); 
+        });
+        settings.freeSpin.freeSpinCount +=5
+        settings.freeSpin.freeSpinsAdded = true;
+    }
+         else {
+        console.log("Colossal merge will not happen.");
+    }
+}
+
+
+function reducedMatrixForArthurBonus( gameInstance:SLPB){
+    const { settings } = gameInstance;
+    const validSymbolsForArthur = gameInstance.currentGameData.gameSettings.Symbols.filter((symbol)=> symbol.isArthurSymbol).map((symbol)=>symbol.Id);    
+    settings.resultSymbolMatrix.map((row, rowIndex)=>{
+      row.map((symbol, colIndex)=>{
+        if(!validSymbolsForArthur.includes(symbol)){
+            const randomIndex = Math.floor(Math.random() * validSymbolsForArthur.length);
+            const randomSymbol = validSymbolsForArthur[randomIndex];  
+            settings.resultSymbolMatrix[rowIndex][colIndex] = randomSymbol;
+        }
+      })
+    })    
+}
+
+
+function checkBonusSymbolCount(gameInstance:SLPB){
+    const { settings } = gameInstance;
+    let bonusSymbolCount = 0;
+    const validBonusSymbol = [settings.bonus.SymbolID,settings.arthurBonus.SymbolID,settings.pollyBonus.SymbolID,settings.tomBonus.SymbolID, ]
+    settings.resultSymbolMatrix.map((row)=>{
+        row.map((symbol)=>{
+            if(validBonusSymbol.includes(symbol)){
+                bonusSymbolCount+=1;
+            }
+        })        
+  
+    })
+    // console.log(settings.resultSymbolMatrix)    
+
+    if(bonusSymbolCount >=3 ){
+        // console.log(bonusSymbolCount, "Bonus Symbol Count");
+        settings.freeSpin.freeSpinCount +=5
+        settings.freeSpin.freeSpinsAdded = true;
+    }
+}
 
 
 /**
@@ -580,6 +814,9 @@ export function makeResultJson(gameInstance: SLPB) {
                 freeSpinAdded: settings.freeSpin.freeSpinsAdded,
                 frozenIndices: settings.frozenIndices,
                 isGrandPrize: settings.isGrandPrize,
+                isThunderSpin: settings.thunderBonus.isThunderBonus,
+                thunderSpinCount: settings.thunderBonus.thunderSpinCount,
+                thunderSpinAdded : settings.thunderBonus.thunderSpinsAdded
             },
             PlayerData: {
                 Balance: gameInstance.getPlayerData().credits,

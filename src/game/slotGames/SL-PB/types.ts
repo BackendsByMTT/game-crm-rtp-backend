@@ -10,7 +10,7 @@ interface Symbol {
 
 export interface FrozenIndex {
     position: [number, number];
-    prizeValue?:number;
+    coinsvalue?:number;
     value: number;
     symbol:number|string;
   }
@@ -18,14 +18,14 @@ export interface FrozenIndex {
  
 export interface bonusSymbol {
     position: [number, number];
-    prizeValue:number;
+    coinsvalue:number;
     symbol:number|string;
 
   } 
 
 //  export interface mysterySymbol {
 //     position: [number, number];
-//     prizeValue?:number;
+//     coinsvalue?:number;
 //     symbol: number;
 //  } 
 export interface SLSMSETTINGS {
@@ -46,29 +46,37 @@ export interface SLSMSETTINGS {
     bonusReels: any[][];
     Symbols: Symbol[];
     BonusSymbols: Symbol[];
-    stickySymbolCount: number [],
-    stickySymbolCountProb :number [],
-    prizeValue:number [],
-    prizeValueProb: number [], 
-    mysteryValues: number [],
-    mysteryValueProb :number [],
-    moonMysteryValues:number [],
-    moonMysteryValueProb: number [], 
+    pollyAdjacentColumn: number [],
+    pollyAdjacentColumnProb :number [],
+    coinsvalue:number [],
+    coinsvalueProb: number [],
+    coinsvalueDuringFreeSpins: number [],
+    coinsvalueDuringFreeSpinsProb: number [],
+    pollyAdjacentSymbol: number [],
+    pollyAdjacentSymbolProb :number [],
+    tommyColossalSymbol:number [],
+    tommyColossalSymbolProb: number [],
+    colossalMergeProbability: number, 
     bonusSymbolValue: bonusSymbol[],
     frozenIndices:bonusSymbol[],
     miniMultiplier:number,
-    minorMultiplier:number,
+    megaMultiplier:number,
     majorMultiplier:number,
     grandMultiplier:number,
-    moonMultiplier:number,
-    moonMysteryData:bonusSymbol[],
-    isMoonJackpot:boolean,
-    isStickyBonusSymbol:boolean,
     isGrandPrize:boolean,
-    isStickyBonus:boolean,
+    isArthurBonus:boolean,
+    isTomBonus:boolean,
+    isPollyBonus:boolean,
+    thunderBonus: {
+        thunderSpinCount: number,
+        thunderSpinAwardedCount: number,
+        isThunderBonus: boolean,
+        thunderSpinsAdded: boolean,
+        thunderSpinPayout:number
+    };
     freeSpin: {
         freeSpinCount: number,
-        freeSpinAwarded: number,
+        freeSpinAwardedCount: number,
         useFreeSpin: boolean,
         freeSpinsAdded: boolean,
         freeSpinPayout:number

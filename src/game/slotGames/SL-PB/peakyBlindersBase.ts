@@ -23,7 +23,9 @@ export class SLPB {
 
     get initSymbols() {
         const Symbols = [];
-        this.currentGameData.gameSettings.Symbols.forEach((Element: Symbol) => {
+        //filter symbols which appear only in base game
+        const baseGameSymbol = this.currentGameData.gameSettings.Symbols.filter((symbol) => !symbol.isBonusSymbol || symbol.isSpecialSymbol)
+        baseGameSymbol.forEach((Element: Symbol) => {
             Symbols.push(Element);
         });
         return Symbols;
@@ -34,12 +36,15 @@ export class SLPB {
     get initBonusSymbols() {
         const Symbols = [];
         //filter symbols which appear only in base game
-        const bonusGameSymbol = this.currentGameData.gameSettings.Symbols.filter((symbol)=> symbol.isBonusGameSymbol || symbol.isSpecialSymbol)        
+        const bonusGameSymbol = this.currentGameData.gameSettings.Symbols.filter((symbol)=> symbol.isBonusSymbol || symbol.isSpecialSymbol)        
         bonusGameSymbol.forEach((Element: Symbol) => {
             Symbols.push(Element);
         });    
+        
         return Symbols;
     }
+
+    
 
     sendMessage(action: string, message: any) {
         this.currentGameData.sendMessage(action, message, true);
