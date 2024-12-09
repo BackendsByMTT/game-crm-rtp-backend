@@ -125,7 +125,8 @@ class SLSM {
                 }
                 if (!this.settings.freeSpin.useFreeSpin) {
                     yield this.deductPlayerBalance(this.settings.currentBet);
-                    this.playerData.totalbet += this.settings.currentBet;
+                    // Ensure the totalbet is limited to 4 decimal places
+                    this.playerData.totalbet = parseFloat((this.playerData.totalbet + this.settings.currentBet).toFixed(4));
                 }
                 const spinId = platformSession.currentGameSession.createSpin();
                 platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);

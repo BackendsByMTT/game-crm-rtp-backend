@@ -280,6 +280,7 @@ function checkForWin(gameInstance) {
                     settings.freeSpin.freeSpinPayout = payoutOfBonusGame;
                     settings.freeSpin.useFreeSpin = false;
                     settings.frozenIndices = [];
+                    return;
                 }
             }
             (0, bonus_1.handleBonusGameSpin)(gameInstance);
@@ -290,7 +291,7 @@ function checkForWin(gameInstance) {
         totalPayout += settings.freeSpin.freeSpinPayout;
         // Update player's current winnings and balance
         gameInstance.playerData.currentWining += totalPayout;
-        gameInstance.playerData.haveWon += gameInstance.playerData.currentWining;
+        gameInstance.playerData.haveWon = parseFloat((gameInstance.playerData.haveWon + parseFloat(gameInstance.playerData.currentWining.toFixed(4))).toFixed(4));
         gameInstance.updatePlayerBalance(gameInstance.playerData.currentWining);
         // Reset game state after payout
         makeResultJson(gameInstance);
@@ -300,6 +301,7 @@ function checkForWin(gameInstance) {
         settings._winData.winningSymbols = [];
         settings.freeSpin.freeSpinsAdded = false;
         gameInstance.settings.bonusSymbolValue = [];
+        settings.isGrandPrize = false;
     }
     catch (error) {
         console.error("Error in checkForWin", error);
@@ -601,7 +603,7 @@ function makeResultJson(gameInstance) {
         const sendData = {
             GameData: {
                 ResultReel: settings.resultSymbolMatrix,
-                linesToEmit: settings._winData.winningLines,
+                BonusResultReel: settings.bonusResultMatrix,
                 symbolsToEmit: settings._winData.winningSymbols,
                 isFreeSpin: settings.freeSpin.useFreeSpin,
                 freeSpinCount: settings.freeSpin.freeSpinCount,

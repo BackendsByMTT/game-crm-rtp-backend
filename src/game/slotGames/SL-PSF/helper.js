@@ -352,7 +352,7 @@ function makeResultJson(gameInstance) {
     try {
         const { settings, playerData } = gameInstance;
         const credits = gameInstance.getPlayerData().credits + playerData.currentWining;
-        const Balance = credits.toFixed(2);
+        const Balance = credits.toFixed(3);
         const sendData = {
             GameData: {
                 resultSymbols: settings.resultSymbolMatrix,
