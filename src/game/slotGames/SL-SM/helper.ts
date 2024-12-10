@@ -213,7 +213,8 @@ function getMultipliersForBonusSymbols(gameInstance: SLSM) {
 export function sendInitData(gameInstance: SLSM) {
     gameInstance.settings.lineData =
         gameInstance.settings.currentGamedata.linesApiData;
-    UiInitData.paylines = convertSymbols(gameInstance.settings.Symbols);
+    const symbols = [...gameInstance.settings.Symbols, ...gameInstance.settings.BonusSymbols ]        
+    UiInitData.paylines = convertSymbols(symbols);
     const reels = generateInitialReel(gameInstance.settings);
     const bonusReels = generateInitialBonusReel(gameInstance.settings);
     const bonusMulipliers = getMultipliersForBonusSymbols(gameInstance);
@@ -237,6 +238,7 @@ export function sendInitData(gameInstance: SLSM) {
             totalbet: gameInstance.playerData.totalbet,
         },
     };
+
     gameInstance.sendMessage("InitData", dataToSend);
 }
 /**
@@ -323,6 +325,7 @@ export function checkForWin(gameInstance: SLSM) {
         settings.freeSpin.freeSpinsAdded = false;
         gameInstance.settings.bonusSymbolValue = []
         settings.isGrandPrize = false;
+        settings.moonMysteryData = [];
     } catch (error) {
         console.error("Error in checkForWin", error);
         return [];
@@ -637,6 +640,7 @@ function checkForFreeSpin(gameInstance: SLSM) {
         freeSpin.useFreeSpin = true;
         freeSpin.freeSpinCount += freeSpin.freeSpinAwarded
         gameInstance.settings.frozenIndices = gameInstance.settings.bonusSymbolValue;
+        gameInstance.settings.isStickyBonus = false;
         // console.log(gameInstance.settings.tempResultSymbolMatrix);
     }
     // console.log(`bonus symbol Count: ${bonusSymbolCount}`);
@@ -668,7 +672,7 @@ export function makeResultJson(gameInstance: SLSM) {
                 isGrandPrize: settings.isGrandPrize,
                 isMoonJackpot: settings.isMoonJackpot,
                 moonMysteryData: settings.moonMysteryData,
-                isStickyBonus: settings.isStickyBonusSymbol,
+                isStickyBonus: settings.isStickyBonus,
                 stickyBonusValue: settings.stickyBonusValue,
 
             },
