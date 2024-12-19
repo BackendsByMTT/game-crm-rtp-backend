@@ -13,6 +13,7 @@ exports.SLBB = void 0;
 const helper_1 = require("./helper");
 const RandomResultGenerator_1 = require("../RandomResultGenerator");
 const sessionManager_1 = require("../../../dashboard/session/sessionManager");
+const utils_1 = require("../../../utils/utils");
 class SLBB {
     constructor(currentGameData) {
         this.currentGameData = currentGameData;
@@ -80,34 +81,12 @@ class SLBB {
                 }
                 if (!(this.settings.bonus.count > 0) && !(this.settings.freeSpin.count > 0)) {
                     this.decrementPlayerBalance(this.settings.currentBet);
-                    this.playerData.totalbet += this.settings.currentBet;
+                    this.playerData.totalbet = (0, utils_1.precisionRound)((this.settings.currentBet + this.playerData.totalbet), 4);
                 }
-                // if (!bonus.isTriggered) {
-                //   this.decrementPlayerBalance(this.settings.currentBet);
-                // }
-                // if (heisenberg.freeSpin.freeSpinCount === 1) {
-                //   heisenberg.isTriggered= false;
-                // }
-                // if (freeSpin.count === 1) {
-                //   freeSpin.isFreeSpin = false;
-                // }
-                if (
-                // freeSpin.isFreeSpin &&
-                freeSpin.count > 0 &&
+                if (freeSpin.count > 0 &&
                     !this.settings.bonus.isBonus) {
                     freeSpin.count--;
-                    this.settings.currentBet = 0;
-                    // console.log(
-                    //   freeSpin.count,
-                    //   "this.settings.freeSpinCount"
-                    // );
                 }
-                // !( this.settings.bonus.count>0 ) || !( this.settings.freeSpin.count>0 )
-                // this.incrementPlayerBalance(this.playerData.currentWining)
-                // console.log("bonus", this.settings.bonus.count);
-                // console.log("free", this.settings.freeSpin.count);
-                // console.log("bool", !( this.settings.bonus.count>0 ) || !( this.settings.freeSpin.count>0 ));
-                //
                 const spinId = platformSession.currentGameSession.createSpin();
                 platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
                 if (!(this.settings.bonus.count > 0)) {

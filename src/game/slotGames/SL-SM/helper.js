@@ -200,7 +200,8 @@ function getMultipliersForBonusSymbols(gameInstance) {
 function sendInitData(gameInstance) {
     gameInstance.settings.lineData =
         gameInstance.settings.currentGamedata.linesApiData;
-    gameUtils_1.UiInitData.paylines = (0, gameUtils_1.convertSymbols)(gameInstance.settings.Symbols);
+    const symbols = [...gameInstance.settings.Symbols, ...gameInstance.settings.BonusSymbols];
+    gameUtils_1.UiInitData.paylines = (0, gameUtils_1.convertSymbols)(symbols);
     const reels = generateInitialReel(gameInstance.settings);
     const bonusReels = generateInitialBonusReel(gameInstance.settings);
     const bonusMulipliers = getMultipliersForBonusSymbols(gameInstance);
@@ -302,6 +303,7 @@ function checkForWin(gameInstance) {
         settings.freeSpin.freeSpinsAdded = false;
         gameInstance.settings.bonusSymbolValue = [];
         settings.isGrandPrize = false;
+        settings.moonMysteryData = [];
     }
     catch (error) {
         console.error("Error in checkForWin", error);
@@ -585,6 +587,7 @@ function checkForFreeSpin(gameInstance) {
         freeSpin.useFreeSpin = true;
         freeSpin.freeSpinCount += freeSpin.freeSpinAwarded;
         gameInstance.settings.frozenIndices = gameInstance.settings.bonusSymbolValue;
+        gameInstance.settings.isStickyBonus = false;
         // console.log(gameInstance.settings.tempResultSymbolMatrix);
     }
     // console.log(`bonus symbol Count: ${bonusSymbolCount}`);
@@ -612,7 +615,7 @@ function makeResultJson(gameInstance) {
                 isGrandPrize: settings.isGrandPrize,
                 isMoonJackpot: settings.isMoonJackpot,
                 moonMysteryData: settings.moonMysteryData,
-                isStickyBonus: settings.isStickyBonusSymbol,
+                isStickyBonus: settings.isStickyBonus,
                 stickyBonusValue: settings.stickyBonusValue,
             },
             PlayerData: {

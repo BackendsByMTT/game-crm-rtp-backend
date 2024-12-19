@@ -14,6 +14,7 @@ const WinData_1 = require("../BaseSlotGame/WinData");
 const gameUtils_1 = require("../../Utils/gameUtils");
 const types_1 = require("./types");
 const bonus_1 = require("./bonus");
+const utils_1 = require("../../../utils/utils");
 function initializeGameSettings(gameData, gameInstance) {
     // const getSymbolIdByName = (name: string) => {
     //   const symbol = gameData.gameSettings.Symbols.find((s: any) => s.Name === name);
@@ -242,7 +243,7 @@ function getRandomValue(gameInstance, type) {
     let values;
     let probabilities;
     if (type === 'coin') {
-        values = currentGameData.gameSettings.coinsvalue.map((value) => value * settings.BetPerLines * settings.lineData.length);
+        values = currentGameData.gameSettings.coinsvalue.map((value) => (0, utils_1.precisionRound)(value * settings.BetPerLines, 5));
         probabilities = currentGameData.gameSettings.coinsvalueprob;
     }
     else if (type === 'freespin') {
@@ -254,7 +255,7 @@ function getRandomValue(gameInstance, type) {
         probabilities = settings.jackpot.payoutProbs;
     }
     else if (type === 'mega') {
-        values = settings.bonus.megaLinkCoinValue.map((value) => value * settings.BetPerLines * settings.lineData.length);
+        values = settings.bonus.megaLinkCoinValue.map((value) => (0, utils_1.precisionRound)(value * settings.BetPerLines, 5));
         probabilities = settings.bonus.megaLinkCoinProb;
     }
     else {
@@ -297,10 +298,11 @@ function getCoinsValues(gameInstance, matrixType) {
                     if (!indexExists) {
                         settings.coins.bonusValues.push({ index: [row, col], value: coinValue });
                         settings.bonus.count = 3;
+                        //NOTE: add rtpcount 
+                        // gameInstance.playerData.rtpSpinCount += 3
                     }
                 }
                 else if (matrixType === 'mega') {
-                    //TODO:
                     coinValue = getRandomValue(gameInstance, "mega");
                     // Check if index already exists in settings.coins.bonusValues
                     const indexExists = settings.coins.bonusValues.find(item => item.index[0] === row && item.index[1] === col);
@@ -308,6 +310,8 @@ function getCoinsValues(gameInstance, matrixType) {
                     if (!indexExists) {
                         settings.coins.bonusValues.push({ index: [row, col], value: coinValue });
                         settings.bonus.count = 3;
+                        //NOTE: add rtpcount 
+                        // gameInstance.playerData.rtpSpinCount += 3
                     }
                     // Only add the new value if the index does not already exist
                     if (!indexExists) {
@@ -380,6 +384,8 @@ function handleFreeSpin(gameInstance) {
     }
     settings.freeSpin.isFreeSpin = true;
     settings.freeSpin.count += count;
+    //NOTE: add rtpcount 
+    // gameInstance.playerData.rtpSpinCount += count
 }
 function accessData(symbol, matchCount, gameInstance) {
     const { settings } = gameInstance;
@@ -552,8 +558,8 @@ function checkForWin(gameInstance) {
         if (settings.jackpot.win > 0) {
             totalWin += settings.jackpot.win;
         }
-        gameInstance.playerData.currentWining = totalWin;
-        gameInstance.playerData.haveWon += totalWin;
+        gameInstance.playerData.currentWining = (0, utils_1.precisionRound)(totalWin, 4);
+        gameInstance.playerData.haveWon = (0, utils_1.precisionRound)((gameInstance.playerData.currentWining + gameInstance.playerData.haveWon), 4);
         gameInstance.incrementPlayerBalance(gameInstance.playerData.currentWining);
         makeResultJson(gameInstance);
         if (settings.freeSpin.count <= 0) {
@@ -596,6 +602,12 @@ function makeResultJson(gameInstance) {
         const { settings, playerData } = gameInstance;
         const credits = gameInstance.getPlayerData().credits;
         const Balance = Number(credits.toFixed(2));
+        let copyCoins = [...settings.coins.values.map(v => {
+                return Object.assign(Object.assign({}, v), { value: v.value / settings.BetPerLines });
+            })];
+        let bonusCoins = [...settings.coins.bonusValues.map(v => {
+                return Object.assign(Object.assign({}, v), { value: v.value / settings.BetPerLines });
+            })];
         const sendData = {
             GameData: {
                 ResultReel: settings.resultSymbolMatrix,
@@ -608,7 +620,8 @@ function makeResultJson(gameInstance) {
                     isNewAdded: settings.freeSpin.isTriggered
                 },
                 winData: {
-                    coinValues: settings.coins.values,
+                    // coinValues: settings.coins.values,
+                    coinValues: copyCoins,
                     losPollos: settings.losPollos.values
                 },
                 jackpot: {
@@ -622,7 +635,8 @@ function makeResultJson(gameInstance) {
                     BonusResult: settings.bonusResultMatrix.map(row => row.map(item => Number(item))),
                     payout: settings.bonus.payout,
                     spinCount: settings.bonus.count,
-                    coins: settings.coins.bonusValues,
+                    // coins: settings.coins.bonusValues,
+                    coins: bonusCoins
                 },
             },
             PlayerData: {
@@ -633,11 +647,11 @@ function makeResultJson(gameInstance) {
             }
         };
         gameInstance.sendMessage('ResultData', sendData);
-        // console.log(sendData);
+        console.log(JSON.stringify(sendData));
         // console.log("coins", sendData.GameData.winData.coinValues);
-        // console.log("Bonus coins", sendData.GameData.bonus.coins);
+        // console.info("Bonus coins", sendData.GameData.bonus);
+        // console.info("freespin", sendData.GameData.freeSpins);
         // console.log("cc", settings.cashCollect.values);
-        //
         // console.log("lp", sendData.GameData.winData.losPollos);
         // console.log("symbolsToEmit", sendData.GameData.symbolsToEmit);
     }

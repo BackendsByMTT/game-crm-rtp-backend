@@ -9,12 +9,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SLSB = void 0;
+exports.SLBOD = void 0;
 const sessionManager_1 = require("../../../dashboard/session/sessionManager");
 const utils_1 = require("../../../utils/utils");
 const RandomResultGenerator_1 = require("../RandomResultGenerator");
+const gamble_1 = require("./gamble");
 const helper_1 = require("./helper");
-class SLSB {
+class SLBOD {
     constructor(currentGameData) {
         this.currentGameData = currentGameData;
         this.playerData = {
@@ -26,11 +27,9 @@ class SLSB {
             currentPayout: 0,
         };
         this.settings = (0, helper_1.initializeGameSettings)(currentGameData, this);
-        console.log("Initialized game settings SL-SB");
         (0, helper_1.generateInitialReel)(this.settings);
         (0, helper_1.sendInitData)(this);
         (0, helper_1.makePayLines)(this);
-        console.log("balance", this.getPlayerData().credits);
     }
     get initSymbols() {
         const Symbols = [];
@@ -63,6 +62,41 @@ class SLSB {
                 this.prepareSpin(response.data);
                 this.getRTP(response.data.spins || 1);
                 break;
+            case "GAMBLEINIT":
+                // const sendData = sendInitGambleData();
+                this.deductPlayerBalance(this.playerData.currentWining);
+                this.playerData.haveWon -= this.playerData.currentWining;
+                // this.sendMessage("gambleInitData", sendData);
+                break;
+            case "GAMBLERESULT":
+                let result = (0, gamble_1.getGambleResult)({ selected: response.cardType });
+                //calculate payout
+                switch (result.playerWon) {
+                    case true:
+                        this.playerData.currentWining *= (response.cardType === "RED" || response.cardType === "BLACK") ? 2 : 4;
+                        result.balance = this.getPlayerData().credits + this.playerData.currentWining;
+                        result.currentWinning = this.playerData.currentWining;
+                        break;
+                    case false:
+                        result.currentWinning = 0;
+                        result.balance = this.getPlayerData().credits;
+                        this.playerData.currentWining = 0;
+                        break;
+                }
+                this.sendMessage("GambleResult", result); // result card 
+                break;
+            case "GAMBLECOLLECT":
+                this.playerData.haveWon += this.playerData.currentWining;
+                this.updatePlayerBalance(this.playerData.currentWining);
+                this.sendMessage("GambleCollect", {
+                    currentWinning: this.playerData.currentWining,
+                    balance: this.getPlayerData().credits
+                }); // balance , currentWinning
+                break;
+            default:
+                console.warn(`Unhandled message ID: ${response.id}`);
+                this.sendError(`Unhandled message ID: ${response.id}`);
+                break;
         }
     }
     prepareSpin(data) {
@@ -80,8 +114,10 @@ class SLSB {
                     return;
                 }
                 const { currentBet } = this.settings;
-                this.deductPlayerBalance(currentBet);
-                this.playerData.totalbet = (0, utils_1.precisionRound)((this.playerData.totalbet + currentBet), 5);
+                if (!(this.settings.freeSpinCount > 0)) {
+                    this.deductPlayerBalance(currentBet);
+                    this.playerData.totalbet = (0, utils_1.precisionRound)(this.playerData.totalbet + currentBet, 5);
+                }
                 const spinId = platformSession.currentGameSession.createSpin();
                 platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
                 new RandomResultGenerator_1.RandomResultGenerator(this);
@@ -126,4 +162,4 @@ class SLSB {
         });
     }
 }
-exports.SLSB = SLSB;
+exports.SLBOD = SLBOD;

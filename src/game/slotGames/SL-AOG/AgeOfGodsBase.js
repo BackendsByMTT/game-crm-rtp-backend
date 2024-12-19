@@ -9,12 +9,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SLSB = void 0;
+exports.SLAOG = void 0;
 const sessionManager_1 = require("../../../dashboard/session/sessionManager");
 const utils_1 = require("../../../utils/utils");
 const RandomResultGenerator_1 = require("../RandomResultGenerator");
 const helper_1 = require("./helper");
-class SLSB {
+class SLAOG {
     constructor(currentGameData) {
         this.currentGameData = currentGameData;
         this.playerData = {
@@ -26,11 +26,9 @@ class SLSB {
             currentPayout: 0,
         };
         this.settings = (0, helper_1.initializeGameSettings)(currentGameData, this);
-        console.log("Initialized game settings SL-SB");
         (0, helper_1.generateInitialReel)(this.settings);
         (0, helper_1.sendInitData)(this);
         (0, helper_1.makePayLines)(this);
-        console.log("balance", this.getPlayerData().credits);
     }
     get initSymbols() {
         const Symbols = [];
@@ -63,6 +61,10 @@ class SLSB {
                 this.prepareSpin(response.data);
                 this.getRTP(response.data.spins || 1);
                 break;
+            default:
+                console.warn(`Unhandled message ID: ${response.id}`);
+                this.sendError(`Unhandled message ID: ${response.id}`);
+                break;
         }
     }
     prepareSpin(data) {
@@ -80,8 +82,13 @@ class SLSB {
                     return;
                 }
                 const { currentBet } = this.settings;
-                this.deductPlayerBalance(currentBet);
-                this.playerData.totalbet = (0, utils_1.precisionRound)((this.playerData.totalbet + currentBet), 5);
+                if (!(this.settings.freeSpinCount > 0)) {
+                    this.deductPlayerBalance(currentBet);
+                    this.playerData.totalbet = (0, utils_1.precisionRound)(this.playerData.totalbet + currentBet, 5);
+                }
+                else {
+                    this.settings.freeSpinCount--;
+                }
                 const spinId = platformSession.currentGameSession.createSpin();
                 platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
                 new RandomResultGenerator_1.RandomResultGenerator(this);
@@ -126,4 +133,4 @@ class SLSB {
         });
     }
 }
-exports.SLSB = SLSB;
+exports.SLAOG = SLAOG;

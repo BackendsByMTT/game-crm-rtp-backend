@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RandomResultGenerator = void 0;
+const gameUtils_1 = require("../Utils/gameUtils");
 class RandomResultGenerator {
     constructor(current) {
         let matrix = [];
@@ -23,7 +24,9 @@ class RandomResultGenerator {
         current.settings.resultSymbolMatrix = matrix;
     }
     getRandomIndex(maxValue) {
-        return Math.floor(Math.random() * (maxValue + 1));
+        let seed = Date.now() + Math.random() * 1000;
+        // return Math.floor(generateRandomNumber(seed, (maxValue + 1)));
+        return Math.floor((0, gameUtils_1.generatetrueRandomNumber)(maxValue + 1));
     }
 }
 exports.RandomResultGenerator = RandomResultGenerator;

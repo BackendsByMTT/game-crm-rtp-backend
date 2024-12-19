@@ -61,7 +61,6 @@ function handleBonusGameSpin(gameInstance) {
         settings.freeSpin.freeSpinCount = 0;
         settings.freeSpin.useFreeSpin = false;
         settings.freeSpin.freeSpinsAdded = false;
-        gameInstance.playerData.currentWining += payoutOfBonusGame;
     }
 }
 /**

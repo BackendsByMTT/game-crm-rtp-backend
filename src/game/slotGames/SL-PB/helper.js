@@ -53,6 +53,7 @@ function initializeGameSettings(gameData, gameInstance) {
         tommyColossalSymbolProb: gameData.gameSettings.tommyColossalSymbolProb,
         bonusSymbolValue: [],
         frozenIndices: [],
+        freeSpinIndices: [],
         miniMultiplier: gameData.gameSettings.miniMultiplier,
         megaMultiplier: gameData.gameSettings.megaMultiplier,
         majorMultiplier: gameData.gameSettings.majorMultiplier,
@@ -350,6 +351,7 @@ function checkForWin(gameInstance) {
         gameInstance.settings._winData.winningSymbols = [];
         settings.freeSpin.freeSpinsAdded = false;
         gameInstance.settings.bonusSymbolValue = [];
+        settings.freeSpinIndices = [];
         settings.freeSpin.freeSpinPayout = 0;
         settings.thunderBonus.thunderSpinsAdded = false;
         settings.thunderBonus.thunderSpinPayout = 0;
@@ -602,6 +604,19 @@ function checkForFreeSpin(gameInstance) {
     // Reset frozen indices
     const mandatoryBonusID = bonus.SymbolID;
     const column5BonusIDs = [arthurBonus.SymbolID, pollyBonus.SymbolID, tomBonus.SymbolID];
+    const freeSpinIndices = [];
+    resultSymbolMatrix.forEach((row, rowIndex) => {
+        if (row[0] === mandatoryBonusID) {
+            freeSpinIndices.push([0, rowIndex]);
+        }
+        if (row[2] === mandatoryBonusID) {
+            freeSpinIndices.push([2, rowIndex]);
+        }
+        if (row[4] === mandatoryBonusID) {
+            freeSpinIndices.push([4, rowIndex]);
+        }
+    });
+    settings.freeSpinIndices = freeSpinIndices;
     const isBonusInColumn1 = resultSymbolMatrix.some(row => row[0] === mandatoryBonusID);
     const isBonusInColumn3 = resultSymbolMatrix.some(row => row[2] === mandatoryBonusID);
     if (isBonusInColumn1 && isBonusInColumn3) {
@@ -825,6 +840,10 @@ function makeResultJson(gameInstance) {
                 freeSpinCount: settings.freeSpin.freeSpinCount,
                 freeSpinAdded: settings.freeSpin.freeSpinsAdded,
                 frozenIndices: settings.frozenIndices,
+                freeSpinIndices: settings.freeSpinIndices,
+                isArthurBonus: settings.isArthurBonus,
+                isTomBonus: settings.isTomBonus,
+                isPollyBonus: settings.isPollyBonus,
                 isGrandPrize: settings.isGrandPrize,
                 isThunderSpin: settings.thunderBonus.isThunderBonus,
                 thunderSpinCount: settings.thunderBonus.thunderSpinCount,
