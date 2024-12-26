@@ -409,13 +409,15 @@ export function checkForWin(gameInstance: SLFLC) {
     if (settings.bonus.spinCount < 0) {
       //NOTE: check for bonus 
       console.log("bonus", checkForBonus(gameInstance))
+      gameInstance.playerData.currentWining = precisionRound(totalPayout, 5);
+      gameInstance.playerData.haveWon = precisionRound(gameInstance.playerData.haveWon +
+        gameInstance.playerData.currentWining, 5)
     } else {
       handleBonusSpin(gameInstance)
+      gameInstance.playerData.haveWon = precisionRound(gameInstance.playerData.haveWon +
+        gameInstance.playerData.currentWining, 5)
     }
 
-    gameInstance.playerData.currentWining = precisionRound(totalPayout, 5);
-    gameInstance.playerData.haveWon = precisionRound(gameInstance.playerData.haveWon +
-      gameInstance.playerData.currentWining, 5)
     makeResultJson(gameInstance)
 
     settings.isFreespin = false

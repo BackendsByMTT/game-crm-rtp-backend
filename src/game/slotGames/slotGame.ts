@@ -21,6 +21,7 @@ import { SLAOG } from "./SL-AOG/AgeOfGodsBase";
 import { SLSG } from "./SL-SG/spartacusGladitaorBase";
 import { SLFLC } from "./SL-FLC/FireLinkChinaTownBase";
 import { SLBS } from "./SL-BS/buffalo777Base";
+import { SLLLL } from "./SL-LLL/LifeOfLuxuryLiteBase";
 import { SLLS } from "./SL-LS/luckySevenBase";
 import { SLWB } from "./SL-WB/wildBuffaloBase";
 export default class SlotGameManager {
@@ -30,8 +31,7 @@ export default class SlotGameManager {
     "SL-CM": SLCM, "SL-CRZ": SLCRZ, "SL-WOF": SLWOF, "SL-PM": SLPM, "SL-BE": SLBE,
     "SL-ONE": SLONE, "SL-LOL": SLLOL, "SL-SR": SLSR, "SL-BB": SLBB, "SL-Z3": SLZEUS,
     "SL-SM": SLSM, "SL-TM": SLTM, "SL-BT": SLBT, "SL-PSF": SLPSF, "SL-SB": SLSB, "SL-BOD": SLBOD,
-    "SL-PB":SLPB, "SL-SG":SLSG, "SL-BS":SLBS,
-     "SL-AOG":SLAOG,"SL-LS":SLLS, "SL-WB":SLWB, "SL-FLC":SLFLC
+    "SL-PB":SLPB, "SL-SG":SLSG, "SL-BS":SLBS, "SL-AOG":SLAOG,"SL-LS":SLLS, "SL-WB":SLWB, "SL-FLC":SLFLC , "SL-LLL":SLLLL
   };
 
   constructor(public currentGameData: currentGamedata) {

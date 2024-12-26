@@ -92,7 +92,7 @@ export function populateScatterValues(gameInstance: SLFLC, type: "base" | "bonus
             settings.bonus.spinCount = 3
           }
           //NOTE: add scatter to values
-          const scatterValue = getRandomValue(gameInstance, "scatter")
+          const scatterValue = getRandomValue(gameInstance, "scatter") * settings.currentBet
           console.log("populate sc", x, y, scatterValue);
 
           settings.scatter.values.push({
@@ -126,6 +126,12 @@ export function handleBonusSpin(gameInstance: SLFLC) {
   settings.currentGamedata.matrix.y = rows
   settings.bonus.spinCount--
   settings.bonus.scatterCount = scatterCount
+  if(scatterCount === 40){
+    settings.bonus.spinCount = -1
+  }
+  if(settings.bonus.spinCount < 0){
+    collectScatter(gameInstance)
+  }
 }
 export function rowsOnExpand(count: number, triggers: { count: [number, number], rows: number }[]): number {
   for (let trigger of triggers) {
@@ -133,4 +139,13 @@ export function rowsOnExpand(count: number, triggers: { count: [number, number],
       return trigger.rows
     }
   }
+}
+
+export function collectScatter(gameInstance: SLFLC) {
+  const { settings } = gameInstance
+  const totalPayout = settings.scatter.values.reduce((acc, sc) => acc + sc.value, 0)
+  console.log(totalPayout);
+  
+  gameInstance.playerData.currentWining = totalPayout
+
 }

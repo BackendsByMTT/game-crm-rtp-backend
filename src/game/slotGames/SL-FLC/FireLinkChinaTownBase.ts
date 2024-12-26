@@ -100,7 +100,7 @@ export class SLFLC {
       }
       //FIX: refactor
       let { currentBet } = this.settings;
-      if (this.settings.freespinCount <= 0) {
+      if (this.settings.freespinCount <= 0 && this.settings.bonus.spinCount <= 0) {
         this.playerData.totalbet += currentBet
         this.deductPlayerBalance(currentBet);
       }
