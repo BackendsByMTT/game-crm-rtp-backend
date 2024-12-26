@@ -49,6 +49,7 @@ export function initializeGameSettings(gameData: any, gameInstance: SLPB) {
         colossalMergeProbability: gameData.gameSettings.colossalMergeProbability,
         tommyColossalSymbol: gameData.gameSettings.tommyColossalSymbol,
         tommyColossalSymbolProb: gameData.gameSettings.tommyColossalSymbolProb,
+        numberofcoinsforbonus:gameData.gameSettings.numberofcoinsforbonus,
         bonusSymbolValue: [],
         frozenIndices: [],
         freeSpinIndices:[],
@@ -56,10 +57,13 @@ export function initializeGameSettings(gameData: any, gameInstance: SLPB) {
         megaMultiplier: gameData.gameSettings.megaMultiplier,
         majorMultiplier: gameData.gameSettings.majorMultiplier,
         grandMultiplier: gameData.gameSettings.grandMultiplier,
+        majorSymbols:gameData.gameSettings.majorSymbols,
+        majorSymbolsProb: gameData.gameSettings.majorSymbolsProb,
         isGrandPrize: false,
         isArthurBonus: false,
         isTomBonus: false,
         isPollyBonus: false,
+        bonusSymbolCount: gameData.gameSettings.bonusSymbolCount,
         thunderBonus: {
             thunderSpinCount: 0,
             thunderSpinAwardedCount: gameData.gameSettings.bonus.thunderIncrementCount,
@@ -69,7 +73,8 @@ export function initializeGameSettings(gameData: any, gameInstance: SLPB) {
         },
         freeSpin: {
             freeSpinsAdded: false,
-            freeSpinAwardedCount: gameData.gameSettings.bonus.incrementCount,
+            freeSpinAwardedCount: gameData.gameSettings.bonus.awardedCount,
+            incrementCount:gameData.gameSettings.bonus.incrementCount,
             freeSpinCount: 0,
             useFreeSpin: false,
             freeSpinPayout: 0
@@ -549,7 +554,7 @@ function handleSpecialSymbols(symbol: any, gameInstance: SLPB) {
  * @throws An error if an invalid type is provided.
  */
 
-export function getRandomValue(gameInstance: SLPB, type: 'polly' | 'coinsValue' | 'pollySymbol' | 'tomCollosal' | 'coinsValueDuringFreeSpin' |'tommy'): number {
+export function getRandomValue(gameInstance: SLPB, type: 'polly' | 'coinsValue' | 'pollySymbol' | 'tomCollosal' | 'coinsValueDuringFreeSpin' |'tommy'|'major'): number {
     const { settings } = gameInstance;
 
     let values: number[];
@@ -576,6 +581,10 @@ export function getRandomValue(gameInstance: SLPB, type: 'polly' | 'coinsValue' 
     else if (type === 'tomCollosal') {
         values = settings?.tommyColossalSymbol;
         probabilities = settings?.tommyColossalSymbolProb;
+    }
+    else if (type === 'major') {
+        values = settings?.majorSymbols;
+        probabilities = settings?.majorSymbolsProb;
     }
     else {
         throw new Error("Invalid type, expected 'coin' or 'freespin'");
@@ -642,7 +651,7 @@ function checkForThunderBonusGame(gameInstance: SLPB) {
     gameInstance.settings.frozenIndices = gameInstance.settings.bonusSymbolValue;
 
 
-    if (coinCount >= 6) {
+    if (coinCount >= settings.numberofcoinsforbonus) {
         gameInstance.settings.tempResultSymbolMatrix = settings.resultSymbolMatrix
 
         settings.thunderBonus.isThunderBonus = true;
@@ -662,7 +671,7 @@ function checkForFreeSpin(gameInstance: SLPB) {
     const { resultSymbolMatrix, bonus, arthurBonus, pollyBonus, tomBonus } = gameInstance.settings;
     const { settings } = gameInstance;
     // Reset frozen indices
-    const mandatoryBonusID = bonus.SymbolID;
+    const mandatoryBonusID = bonus.SymbolID;    
     const column5BonusIDs = [arthurBonus.SymbolID, pollyBonus.SymbolID, tomBonus.SymbolID];
     const freeSpinIndices = []; 
 
@@ -684,7 +693,7 @@ function checkForFreeSpin(gameInstance: SLPB) {
 
     if (isBonusInColumn1 && isBonusInColumn3) {
         const column5BonusID = resultSymbolMatrix.find(row => column5BonusIDs.includes(row[4]))?.[4];
-        if (column5BonusID) {
+        if (column5BonusID) {            
             settings.freeSpin.useFreeSpin = true;
             settings.freeSpin.freeSpinCount = settings.freeSpin.freeSpinAwardedCount;
         }
@@ -782,7 +791,7 @@ function handlePollyBonus(gameInstance: SLPB) {
         row[pollyAdjacentColumn] = getRandomValue(gameInstance, 'pollySymbol');
         row.fill(row[pollyAdjacentColumn], pollyAdjacentColumn + 1, pollyAdjacentColumn + 3);
 
-        console.log(row[pollyAdjacentColumn]);
+        // console.log(row[pollyAdjacentColumn]);
 
     })
     checkBonusSymbolCount(gameInstance);
@@ -821,43 +830,37 @@ function handleTomBonus(gameInstance: SLPB) {
         }
     }
 
-    // if (checkProbability(settings.colossalMergeProbability)) {
-    //     const randomValue = getRandomValue(gameInstance, 'tomCollosal');
-
-    //     settings.resultSymbolMatrix.forEach((row) => {
-    //         row.fill(randomValue, 1, 4);
-    //     });
-    //     settings.freeSpin.freeSpinCount += 5
-    //     settings.freeSpin.freeSpinsAdded = true;
-    // }
-    // else {
-    //     console.log("Colossal merge will not happen.");
-    // }
-
+    if (checkProbability(settings.colossalMergeProbability)) {
+      
     const tommyAdjacentColumn = getRandomValue(gameInstance, 'tommy');
-   const symbolValue =  getRandomValue(gameInstance, 'tomCollosal');
-   console.log(symbolValue);
-   
-   if (
-    symbolValue === settings.bonus.SymbolID ||
-    symbolValue === settings.tomBonus.SymbolID ||
-    symbolValue === settings.arthurBonus.SymbolID ||
-    symbolValue === settings.pollyBonus.SymbolID
-) {    console.log("true");
+    const symbolValue =  getRandomValue(gameInstance, 'tomCollosal');
+    // console.log(symbolValue);
     
-    settings.freeSpin.freeSpinCount += 5
-        settings.freeSpin.freeSpinsAdded = true;
-}
-    settings.resultSymbolMatrix.map((row, rowIndex) => {
-
-        row[tommyAdjacentColumn] = symbolValue;
+    if (
+     symbolValue === settings.bonus.SymbolID ||
+     symbolValue === settings.tomBonus.SymbolID ||
+     symbolValue === settings.arthurBonus.SymbolID ||
+     symbolValue === settings.pollyBonus.SymbolID
+ ) {  
+     
+     settings.freeSpin.freeSpinCount += settings.freeSpin.incrementCount
+         settings.freeSpin.freeSpinsAdded = true;
+ }
+     settings.resultSymbolMatrix.map((row, rowIndex) => {
+ 
+         row[tommyAdjacentColumn] = symbolValue;
+         
         
-       
-        row.fill(row[tommyAdjacentColumn], tommyAdjacentColumn + 1,tommyAdjacentColumn + 3);
+         row.fill(row[tommyAdjacentColumn], tommyAdjacentColumn + 1,tommyAdjacentColumn + 3);
+ 
+         console.log(row[tommyAdjacentColumn]);
+ 
+     })
+    }
+    else {
+        console.log("Colossal merge will not happen.");
+    }
 
-        console.log(row[tommyAdjacentColumn]);
-
-    })
 }
 
 /**
@@ -887,8 +890,7 @@ function reducedMatrixForArthurBonus(gameInstance: SLPB) {
     settings.resultSymbolMatrix.map((row, rowIndex) => {
         row.map((symbol, colIndex) => {
             if (!validSymbolsForArthur.includes(symbol)) {
-                const randomIndex = Math.floor(Math.random() * validSymbolsForArthur.length);
-                const randomSymbol = validSymbolsForArthur[randomIndex];
+                const randomSymbol =getRandomValue(gameInstance, 'major');                
                 settings.resultSymbolMatrix[rowIndex][colIndex] = randomSymbol;
             }
         })
@@ -930,9 +932,9 @@ function checkBonusSymbolCount(gameInstance: SLPB) {
     })
     // console.log(settings.resultSymbolMatrix)    
 
-    if (bonusSymbolCount >= 3) {
+    if (bonusSymbolCount >= settings.bonusSymbolCount) {
         // console.log(bonusSymbolCount, "Bonus Symbol Count");
-        settings.freeSpin.freeSpinCount += 5
+        settings.freeSpin.freeSpinCount += settings.freeSpin.incrementCount
         settings.freeSpin.freeSpinsAdded = true;
     }
 }

@@ -4,32 +4,17 @@ import { WinData } from "../BaseSlotGame/WinData";
 interface Symbol {
     Name: string;
     Id: number;
-    payout: number;
-    canmatch:[];
     reelInstance: { [key: string]: number };
 }
-
-export interface FrozenIndex {
-    position: [number, number];
-    prizeValue?:number;
-    value: number;
-    symbol:number|string;
-  }
+type WheelFeature = {
+    featureValues: number[]; 
+    featureProbs: number[];  
+};
 
  
-export interface bonusSymbol {
-    position: [number, number];
-    prizeValue:number;
-    symbol:number|string;
+export type FeatureType = "MINI" | "MINOR" | "MAJOR" | "FREESPIN" | "GRAND" ;
 
-  } 
-
-//  export interface mysterySymbol {
-//     position: [number, number];
-//     prizeValue?:number;
-//     symbol: number;
-//  } 
-export interface SLLSSETTINGS {
+export interface SLWBSETTINGS {
     id: string;
     matrix: { x: number, y: number };
     currentGamedata: GameData;
@@ -45,6 +30,9 @@ export interface SLLSSETTINGS {
     Symbols: Symbol[];
     payoutCombination: any [][],
     anyMatchCount:number;
+    smallWheelFeature: WheelFeature;
+    mediumWheelFeature: WheelFeature;
+    largeWheelFeature: WheelFeature;
     freeSpin: {
         freeSpinCount: number,
         freeSpinAwarded: number,
@@ -62,35 +50,27 @@ export interface SLLSSETTINGS {
         SymbolID: number;
         useWild: boolean;
     },
-    jackpot:{
+    goldenBonus:{
         SymbolName: string;
         SymbolID: number;
         useWild: boolean
     },
-    bar3:{
-        SymbolName: string;
-        SymbolID: number;
-        useWild: boolean
-    },
-    bar2:{
-        SymbolName: string;
-        SymbolID: number;
-        useWild: boolean
-    },
-    bar1:{
-        SymbolName: string;
-        SymbolID: number;
-        useWild: boolean
-    },
-    isJackpot : boolean,
+    isBonusTriggered:boolean,
+    issmallBonusTriggered:boolean,
+    ismediumBonusTriggered:boolean,
+    islargeBonusTriggered:boolean,
+    indexToStop:number,
+    bonusCount: number[],
+    bonusTriggerCount:number,
+    bonusTriggerCountDuringFreeSpin:number,
+    bonusCountDuringFreeSpins:number[],
+    freeSpinDuringBonus:number[],
+    
 }
 
 
 export enum specialIcons {
     wild = "Wild",
     bonus = "Bonus",
-     jackpot = "Jackpot",
-     bar3 = "Bar3",
-     bar2 = "Bar2",
-     bar1 = "Bar1"
+    goldenBonus = "GoldenBonus",
 }
