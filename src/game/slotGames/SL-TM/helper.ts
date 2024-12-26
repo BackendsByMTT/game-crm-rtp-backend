@@ -1,6 +1,6 @@
 import { SymbolType, GameResult, WinningCombination, SpecialSymbols } from './types';
 import { WinData } from "../BaseSlotGame/WinData";
-import { convertSymbols, UiInitData } from '../../Utils/gameUtils';
+import { convertSymbols, UiInitData,shuffleArray } from '../../Utils/gameUtils';
 import { precisionRound } from '../../../utils/utils';
 import { SLTM } from './TimeMachineBase';
 
@@ -87,13 +87,6 @@ export function generateInitialReel(gameSettings: any): number[][] {
   }
 }
 
-
-function shuffleArray(array: any[]) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-}
 
 export function sendInitData(gameInstance: SLTM) {
   UiInitData.paylines = convertSymbols(gameInstance.settings.Symbols);

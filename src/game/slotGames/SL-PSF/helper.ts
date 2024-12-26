@@ -2,6 +2,7 @@ import { WinData } from "../BaseSlotGame/WinData";
 import {
   convertSymbols,
   UiInitData,
+  shuffleArray
 } from "../../Utils/gameUtils";
 import { SLPSF } from "./president45Base";
 import { specialIcons } from "./types";
@@ -72,16 +73,6 @@ export function generateInitialReel(gameSettings: any): string[][] {
   return reels;
 }
 
-/**
- * Shuffles the elements of an array in place using the Fisher-Yates algorithm.
- * @param array - The array to be shuffled.
- */
-function shuffleArray(array: any[]) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-}
 
 export function makePayLines(gameInstance: SLPSF) {
   const { settings } = gameInstance;

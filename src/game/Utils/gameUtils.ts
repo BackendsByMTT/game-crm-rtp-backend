@@ -139,26 +139,28 @@ export async function getPlayerCredits(playerName: string) {
     }
 }
 
-export function shuffleArray(array: any[]) {
+export function shuffleArray<T>(array: T[]): T[] {
     // List of RNG functions
     const rngFunctions = [
         (max: number) => generateRandomNumber(Date.now(), max), // RNG1
-		    (max: number) => chaoticRandom(generateUniqueSeed()) * max, // RNG2
-		    (max: number) => generatelcgRandomNumbers(generateUniqueSeed(), max), // RNG3
-		    (max: number) => generatetrueRandomNumber(max) // RNG4      
+        (max: number) => chaoticRandom(generateUniqueSeed()) * max, // RNG2
+        (max: number) => generatelcgRandomNumbers(generateUniqueSeed(), max), // RNG3
+        (max: number) => generatetrueRandomNumber(max) // RNG4
     ];
-    
+
     for (let i = array.length - 1; i > 0; i--) {
         const rngIndex = Math.floor(Math.random() * rngFunctions.length);
         const rngFunction = rngFunctions[rngIndex];
-        let j = Math.floor(rngFunction(i + 1));
+        const j = Math.floor(rngFunction(i + 1));
 
-        let k = array[i];
-        array[i] = array[j];
-        array[j] = k;
+        // Swap elements at index i and j
+        [array[i], array[j]] = [array[j], array[i]];
     }
-    
+
+    // Return the shuffled array
+    return array;
 }
+
 
 // RNG1
 
