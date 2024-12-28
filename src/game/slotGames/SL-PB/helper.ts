@@ -339,7 +339,8 @@ export function checkForWin(gameInstance: SLPB) {
 
                     if (symbolMultiplier > 0) {
                         totalPayout += symbolMultiplier * gameInstance.settings.BetPerLines;
-                        gameInstance.playerData.currentWining += totalPayout;
+                        // console.log(totalPayout, gameInstance.settings.BetPerLines);
+                        
 
                         settings._winData.winningLines.push(index);
                         winningLines.push({
@@ -361,6 +362,7 @@ export function checkForWin(gameInstance: SLPB) {
             });
 
         }
+        gameInstance.playerData.currentWining += totalPayout;
 
         totalPayout += settings.thunderBonus.thunderSpinPayout;
 
