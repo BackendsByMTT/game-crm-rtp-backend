@@ -317,7 +317,7 @@ function checkForWin(gameInstance) {
                     const symbolMultiplier = accessData(firstSymbol, matchCount, gameInstance);
                     if (symbolMultiplier > 0) {
                         totalPayout += symbolMultiplier * gameInstance.settings.BetPerLines;
-                        gameInstance.playerData.currentWining += totalPayout;
+                        // console.log(totalPayout, gameInstance.settings.BetPerLines);
                         settings._winData.winningLines.push(index);
                         winningLines.push({
                             line,
@@ -336,6 +336,7 @@ function checkForWin(gameInstance) {
                 }
             });
         }
+        gameInstance.playerData.currentWining += totalPayout;
         totalPayout += settings.thunderBonus.thunderSpinPayout;
         //   console.log("Total Winning", gameInstance.playerData.currentWining);
         //   console.log("Total Free Spins Won:", gameInstance.settings.freeSpin.freeSpinCount);

@@ -228,30 +228,6 @@ function checkSymbolOcuurence(gameInstance) {
     return { isWinning, totalPayout };
 }
 /**
- * Retrieves the multiplier associated with a symbol and match count.
- * @param symbol - The symbol for which the multiplier is retrieved.
- * @param matchCount - The number of matching symbols.
- * @param gameInstance - The game instance containing symbol data.
- * @returns The multiplier value or 0 if no data is found.
- */
-function accessData(symbol, matchCount, gameInstance) {
-    const { settings } = gameInstance;
-    try {
-        const symbolData = settings.currentGamedata.Symbols.find((s) => s.Id.toString() === symbol.toString());
-        if (symbolData) {
-            const multiplierArray = symbolData.multiplier;
-            if (multiplierArray && multiplierArray[16 - matchCount]) {
-                return multiplierArray[16 - matchCount][0];
-            }
-        }
-        return 0;
-    }
-    catch (error) {
-        // console.error("Error in accessData:");
-        return 0;
-    }
-}
-/**
  * Configures game settings based on the special symbol provided.
  * Updates the relevant symbol properties in the game instance based on the type of the special symbol.
  *

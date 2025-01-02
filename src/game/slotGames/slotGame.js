@@ -28,6 +28,7 @@ const buffalo777Base_1 = require("./SL-BS/buffalo777Base");
 const LifeOfLuxuryLiteBase_1 = require("./SL-LLL/LifeOfLuxuryLiteBase");
 const luckySevenBase_1 = require("./SL-LS/luckySevenBase");
 const wildBuffaloBase_1 = require("./SL-WB/wildBuffaloBase");
+const fruitMaryBase_1 = require("./SL-FM/fruitMaryBase");
 class SlotGameManager {
     constructor(currentGameData) {
         // console.log("Requesting Game : ",currentGameData.gameSettings.id);
@@ -36,6 +37,7 @@ class SlotGameManager {
             "SL-CM": cashMachineBase_1.SLCM, "SL-CRZ": crazy777Base_1.SLCRZ, "SL-WOF": wheelOfFortuneBase_1.SLWOF, "SL-PM": planetMoolahBase_1.SLPM, "SL-BE": bloodEternalBase_1.SLBE,
             "SL-ONE": OneOfAKindBase_1.SLONE, "SL-LOL": LifeOfLuxury_1.SLLOL, "SL-SR": stinkinRichBase_1.SLSR, "SL-BB": breakingBadBase_1.SLBB, "SL-Z3": zeusBase_1.SLZEUS,
             "SL-SM": sizzlingMoonBase_1.SLSM, "SL-TM": TimeMachineBase_1.SLTM, "SL-BT": buffaloTrailBase_1.SLBT, "SL-PSF": president45Base_1.SLPSF, "SL-SB": Starburst_1.SLSB, "SL-BOD": BookOfDeadBase_1.SLBOD,
+            "SL-FM": fruitMaryBase_1.SLFM,
             "SL-PB": peakyBlindersBase_1.SLPB, "SL-SG": spartacusGladitaorBase_1.SLSG, "SL-BS": buffalo777Base_1.SLBS, "SL-AOG": AgeOfGodsBase_1.SLAOG, "SL-LS": luckySevenBase_1.SLLS, "SL-WB": wildBuffaloBase_1.SLWB, "SL-FLC": FireLinkChinaTownBase_1.SLFLC, "SL-LLL": LifeOfLuxuryLiteBase_1.SLLLL
         };
         const slotGameClass = this.gameClassMapping[currentGameData.gameSettings.id];

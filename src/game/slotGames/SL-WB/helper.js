@@ -183,11 +183,10 @@ function checkForWin(gameInstance) {
                 firstSymbol = findFirstNonWildSymbol(line, gameInstance);
             }
             const { isWinningLine, matchCount, matchedIndices: winMatchedIndices } = checkLineSymbols(firstSymbol, line, gameInstance);
-            if ((isWinningLine && matchCount >= settings.bonusTriggerCount)) {
+            if ((isWinningLine && matchCount >= 3)) {
                 const symbolMultiplier = accessData(firstSymbol, matchCount, gameInstance);
                 if (symbolMultiplier > 0) {
                     totalPayout += symbolMultiplier * gameInstance.settings.BetPerLines;
-                    gameInstance.playerData.currentWining += totalPayout;
                     settings._winData.winningLines.push(index);
                     winningLines.push({
                         line,
@@ -232,24 +231,19 @@ function checkLineSymbols(firstSymbol, line, gameInstance) {
         let matchCount = 1;
         let currentSymbol = firstSymbol;
         const matchedIndices = [{ col: 0, row: line[0] }];
-        const matchedSymbols = [Number(firstSymbol)];
-        const firstSymbolObject = settings.Symbols.find(symbol => symbol.Id === Number(firstSymbol));
-        const canMatchSymbols = (firstSymbolObject === null || firstSymbolObject === void 0 ? void 0 : firstSymbolObject.canmatch) || [];
         // Loop through the line
         for (let i = 1; i < line.length; i++) {
             const rowIndex = line[i];
             const symbol = settings.resultSymbolMatrix[rowIndex][i];
             if (symbol === undefined) {
                 console.error(`Symbol at position [${rowIndex}, ${i}] is undefined.`);
-                return { isWinningLine: false, matchCount: 0, matchedIndices: [], matchedSymbols: [] };
+                return { isWinningLine: false, matchCount: 0, matchedIndices: [] };
             }
             // Check for matches (consider wild symbols and canmatch)
             if (symbol === currentSymbol ||
-                symbol === wildSymbol ||
-                (currentSymbol !== wildSymbol && canMatchSymbols.includes(symbol.toString()))) {
+                symbol === wildSymbol) {
                 matchCount++;
                 matchedIndices.push({ col: i, row: rowIndex });
-                matchedSymbols.push(symbol);
             }
             else if (currentSymbol === wildSymbol) {
                 currentSymbol = symbol;
@@ -260,11 +254,11 @@ function checkLineSymbols(firstSymbol, line, gameInstance) {
                 break;
             }
         }
-        return { isWinningLine: matchCount >= 3, matchCount, matchedIndices, matchedSymbols };
+        return { isWinningLine: matchCount >= 3, matchCount, matchedIndices };
     }
     catch (error) {
         console.error("Error in checkLineSymbols:", error);
-        return { isWinningLine: false, matchCount: 0, matchedIndices: [], matchedSymbols: [] };
+        return { isWinningLine: false, matchCount: 0, matchedIndices: [] };
     }
 }
 function findFirstNonWildSymbol(line, gameInstance) {
