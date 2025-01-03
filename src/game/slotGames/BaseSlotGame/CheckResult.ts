@@ -85,9 +85,15 @@ export class CheckResult {
             if (this.currentGame.settings.currentGamedata.bonus.type == bonusGameType.tap) {
                 this.bonusResult = this.currentGame.settings.bonus.game.generateData();
                 this.currentGame.settings._winData.totalWinningAmount += this.currentGame.settings.bonus.game.setRandomStopIndex();
+
+                this.currentGame.settings._winData.specialFeatures.bonus.amountWon = this.currentGame.settings.bonus.game.setRandomStopIndex();
             }
-            if (this.currentGame.settings.currentGamedata.bonus.type == bonusGameType.spin)
+
+            if (this.currentGame.settings.currentGamedata.bonus.type == bonusGameType.spin) {
                 this.currentGame.settings._winData.totalWinningAmount += this.currentGame.settings.bonus.game.setRandomStopIndex();
+
+                this.currentGame.settings._winData.specialFeatures.bonus.amountWon = this.currentGame.settings.bonus.game.setRandomStopIndex();
+            }
 
             //NOTE: minispin for fruity cocktail
             if (this.currentGame.settings.currentGamedata.bonus.type == bonusGameType.miniSpin) {
@@ -96,11 +102,16 @@ export class CheckResult {
                 const result = runMiniSpin(this.currentGame.settings.currentGamedata.bonus, betPerLines);
                 this.bonusResult = result
                 this.currentGame.settings._winData.totalWinningAmount += result.totalWinAmount;
+
+                this.currentGame.settings._winData.specialFeatures.bonus.amountWon = result.totalWinAmount;
             }
+
             if (this.currentGame.settings.currentGamedata.bonus.type == bonusGameType.layerTap) {
                 const result = this.currentGame.settings.bonus.game.setRandomStopIndex(this.bonusResult)
                 this.currentGame.settings._winData.totalWinningAmount += result.amount;
                 this.bonusResult = result.selectedIndex
+
+                this.currentGame.settings._winData.specialFeatures.bonus.amountWon = result.amount;
             }
 
         }
@@ -270,6 +281,9 @@ export class CheckResult {
 
             if (temp.length > (5 - this.currentGame.settings.scatter.multiplier.length)) {
                 const winningAmount = this.accessData(this.currentGame.settings.scatter.symbolID, temp.length);
+
+                this.currentGame.settings._winData.specialFeatures.scatter.amountWon = winningAmount * this.currentGame.settings.BetPerLines;
+
                 this.currentGame.settings._winData.totalWinningAmount += winningAmount * this.currentGame.settings.BetPerLines;
                 this.currentGame.settings._winData.winningSymbols.push(temp);
 
@@ -288,8 +302,9 @@ export class CheckResult {
             ) {
                 // console.log("!!!!!JACKPOT!!!!!");
                 this.currentGame.settings._winData.winningSymbols.push(this.jackpotWinSymbols);
-                this.currentGame.settings._winData.totalWinningAmount += this.jackpot.defaultAmount * this.currentGame.settings.BetPerLines;;
-                this.currentGame.settings._winData.jackpotwin += this.jackpot.defaultAmount * this.currentGame.settings.BetPerLines;;
+                this.currentGame.settings._winData.totalWinningAmount += this.jackpot.defaultAmount * this.currentGame.settings.BetPerLines;
+
+                this.currentGame.settings._winData.specialFeatures.jackpot.amountWon = this.jackpot.defaultAmount * this.currentGame.settings.BetPerLines;
             }
         }
     }

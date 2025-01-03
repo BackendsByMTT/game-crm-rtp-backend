@@ -1,8 +1,6 @@
 import mongoose, { Schema } from "mongoose";
 import { IPlatform } from "../../game/slotGames/BaseSlotGame/gameType";
 
-
-
 const newGameSchema = new Schema({
   name: {
     type: String,
@@ -40,6 +38,9 @@ const newGameSchema = new Schema({
     type: mongoose.Schema.Types.ObjectId,
     required: true,
     ref: 'Payout'
+  },
+  description: {
+    type: String,
   },
   createdAt: {
     type: Date,

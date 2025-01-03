@@ -14,6 +14,7 @@ export interface IGame extends Document {
   tagName: string;
   slug: string;
   payout: Types.ObjectId;
+  description: string;
   createdAt: Date
 }
 
@@ -61,7 +62,7 @@ export interface GameData {
   bets: number[]; // Add this line to include bets property
   matrix: { x: number; y: number };
   linesCount: number; // Add this line to include linesCount property
-  betMultiplier:number[]
+  betMultiplier: number[]
 }
 
 

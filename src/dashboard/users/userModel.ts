@@ -1,13 +1,17 @@
 import mongoose, { Model, Schema, Types } from "mongoose";
 import { IPlayer, IUser } from "./userType";
 
-const UserSchema: Schema = new Schema<IUser>(
+export const UserSchema: Schema = new Schema<IUser>(
   {
     name: { type: String, required: true },
     username: { type: String, required: true, unique: true },
     status: { type: String, default: "active" },
     password: { type: String, required: true },
-    role: { type: String, required: true },
+    role: {
+      type: String,
+      required: true,
+      enum: ["admin", "supermaster", "master", "distributor", "subdistributor", "store"]
+    },
     subordinates: [
       { type: mongoose.Types.ObjectId, refPath: "subordinateModel" },
     ],
@@ -24,7 +28,8 @@ const UserSchema: Schema = new Schema<IUser>(
 
 UserSchema.virtual("subordinateModel").get(function (this: IUser) {
   const rolesHierarchy: Record<string, string> = {
-    company: "User",
+    admin: "User",
+    supermaster: "User",
     master: "User",
     distributor: "User",
     subdistributor: "User",
@@ -33,7 +38,7 @@ UserSchema.virtual("subordinateModel").get(function (this: IUser) {
   return rolesHierarchy[this.role];
 });
 
-const PlayerSchema = new Schema<IPlayer>(
+export const PlayerSchema = new Schema<IPlayer>(
   {
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },

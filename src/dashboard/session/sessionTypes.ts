@@ -1,6 +1,7 @@
 export interface IGameSession {
     playerId: string;         // Unique player identifier
     gameId: string;           // Unique game identifier
+    gameName: string;         // Game name
     sessionId: string;        // Unique session identifier
     entryTime: Date;          // Session start time
     exitTime: Date | null;    // Session end time (null if not ended)
@@ -28,17 +29,13 @@ export interface ISpecialFeatures {
 
 
 export interface IJackpot {
-    triggered: boolean;       // Whether the jackpot was triggered
     amountWon: number;        // Amount won from the jackpot
 }
 
 export interface IScatter {
-    triggered: boolean;       // Whether scatter was triggered
     amountWon: number;        // Amount won from the scatter
 }
 
 export interface IBonus {
-    triggered: boolean;        // Whether a bonus game was triggered
-    bonusGameRounds: number;   // Number of bonus rounds played
-    totalBonusWin: number;     // Total winnings from the bonus game
+    amountWon: number;     // Total winnings from the bonus game
 }

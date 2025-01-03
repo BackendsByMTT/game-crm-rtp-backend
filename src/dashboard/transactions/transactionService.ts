@@ -7,6 +7,7 @@ import { Player, User } from "../users/userModel";
 import { QueryParams } from "../../utils/globalTypes";
 import { messageType } from "../../game/Utils/gameUtils";
 import { sessionManager } from "../session/sessionManager";
+import { hasPermission } from "../../utils/permissions";
 
 export class TransactionService {
 
@@ -24,11 +25,8 @@ export class TransactionService {
       throw createHttpError(403, "The client must exit their current game session before initiating a transaction.");
     }
 
-    if (!rolesHierarchy[manager.role]?.includes(client.role)) {
-      throw createHttpError(
-        403,
-        `A ${manager.role} is not authorized to perform transactions with a ${client.role}.`
-      );
+    if (!hasPermission(manager, `${client.role}s`, "w")) {
+      throw createHttpError(403, "You do not have permission to perform this action.");
     }
 
     if (type === "recharge") {
@@ -79,9 +77,8 @@ export class TransactionService {
   ) {
     const skip = (page - 1) * limit;
 
-    const user =
-      (await User.findOne({ username })) ||
-      (await Player.findOne({ username }));
+    const user = await User.findOne({ username }) || await Player.findOne({ username });
+
     if (!user) {
       throw new Error("User not found");
     }
@@ -122,8 +119,15 @@ export class TransactionService {
       ],
     })
       .sort({ [sortField]: sortOrder } as Record<string, SortOrder>) // Explicit cast to Record<string, SortOrder>
-      .skip(skip)
+      .skip((page - 1) * limit)
       .limit(limit);
+
+    console.log("transactions", {
+      totalTransactions,
+      totalPages,
+      currentPage: page,
+      outOfRange: false,
+    });
 
 
     return {

@@ -35,12 +35,12 @@ const verifySocketToken = (socket: Socket): Promise<DecodedToken> => {
 };
 
 const getPlayerDetails = async (username: string) => {
-    const player = await PlayerModel.findOne({ username }).populate<{ createdBy: IUser }>("createdBy", "name");
+    const player = await PlayerModel.findOne({ username }).populate<{ createdBy: IUser }>("createdBy", "username");
     if (player) {
         return {
             credits: player.credits,
             status: player.status,
-            managerName: player.createdBy?.name || null
+            managerName: player.createdBy?.username || null
         };
     }
     throw new Error("Player not found");
@@ -170,12 +170,12 @@ const handleManagerConnection = async (socket: Socket, decoded: DecodedToken, us
     }
 
     // Send all active players to the manager upon connection
-    const activeUsersData = Array.from(sessionManager.getPlatformSessions().values()).map(player => {
-        const platformSession = sessionManager.getPlayerPlatform(player.playerData.username);
-        return platformSession?.getSummary() || {};
-    });
+    // const activeUsersData = Array.from(sessionManager.getPlatformSessions().values()).map(player => {
+    //     const platformSession = sessionManager.getPlayerPlatform(player.playerData.username);
+    //     return platformSession?.getSummary() || {};
+    // });
 
-    socket.emit("activePlayers", activeUsersData);
+    // socket.emit("activePlayers", activeUsersData);
 };
 
 
@@ -204,7 +204,7 @@ const socketController = (io: Server) => {
 
             if (role === "player") {
                 await handlePlayerConnection(socket, decoded, userAgent);
-            } else if (['company', 'master', 'distributor', 'subdistributor', 'store'].includes(role)) {
+            } else if (['admin', 'supermaster', 'master', 'distributor', 'subdistributor', 'store'].includes(role)) {
                 await handleManagerConnection(socket, decoded, userAgent)
             } else {
                 console.error("Unsupported role : ", role);

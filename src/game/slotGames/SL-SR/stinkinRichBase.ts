@@ -82,11 +82,10 @@ export class SLSR {
                 await this.deductPlayerBalance(this.settings.currentBet);
                 this.playerData.totalbet += this.settings.currentBet;
             }
-        
-            if(this.settings.freeSpin.freeSpinCount>0)
-            {   
-                
-                this.settings.freeSpin.freeSpinCount --;
+
+            if (this.settings.freeSpin.freeSpinCount > 0) {
+
+                this.settings.freeSpin.freeSpinCount--;
             }
 
             const spinId = platformSession.currentGameSession.createSpin();
@@ -97,6 +96,16 @@ export class SLSR {
 
             const winAmount = this.playerData.currentWining;
             platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', winAmount);
+
+            const jackpotAmount = this.settings._winData.specialFeatures.jackpot.amountWon || 0;
+            const scatterAmount = this.settings._winData.specialFeatures.scatter.amountWon || 0;
+            const bonusAmount = this.settings._winData.specialFeatures.bonus.amountWon || 0;
+
+            platformSession.currentGameSession.updateSpinField(spinId, "specialFeatures", {
+                jackpot: { amountWon: jackpotAmount },
+                scatter: { amountWon: scatterAmount },
+                bonus: { amountWon: bonusAmount },
+            });
 
         } catch (error) {
             this.sendError("Spin error");

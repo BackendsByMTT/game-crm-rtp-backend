@@ -51,14 +51,10 @@ export default class Manager {
 
         this.socketData = {
             socket: socket,
-            heartbeatInterval: setInterval(() => {
-                // Check if socket is still connected before emitting
+            heartbeatInterval: setInterval(async () => {
                 if (this.socketData.socket) {
-                    const activeUsersData = Array.from(sessionManager.getPlatformSessions().values()).map(player => {
-                        const platformSession = sessionManager.getPlayerPlatform(player.playerData.username);
-                        return platformSession?.getSummary() || {};
-                    });
-                    this.socketData.socket.emit("activePlayers", activeUsersData);
+                    const activePlayers = await sessionManager.getPlayersSummariesByManager(this.username, this.role);
+                    this.socketData.socket.emit("activePlayers", activePlayers);
                     this.sendData({ type: "CREDITS", payload: { credits: this.credits, role: this.role } })
                 }
             }, 5000),

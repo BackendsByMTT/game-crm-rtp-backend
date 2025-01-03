@@ -265,8 +265,8 @@ class PayoutsController {
         const gameId = tagName;
         if (playerSocket.currentGameData.gameId === gameId) {
           playerSocket.currentGameData.gameSettings
-          
-          
+
+
           // initialize(matchingPayout.content.data)
         }
       }

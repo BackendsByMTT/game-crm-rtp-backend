@@ -7,7 +7,7 @@ export async function checkAdmin(req: Request, res: Response, next: NextFunction
     const { role } = _req.user;
 
     try {
-        if (role !== "company") {
+        if (role !== "admin") {
             const error = createHttpError(403, 'Access Denied: You do not have permission to access this resource.');
             return next(error);
         }

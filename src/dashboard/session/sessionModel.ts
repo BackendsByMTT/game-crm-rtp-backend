@@ -2,19 +2,15 @@ import mongoose, { Model, Schema } from "mongoose";
 import { IBonus, IGameSession, IJackpot, IScatter, ISpecialFeatures, ISpinData } from "./sessionTypes";
 
 const JackpotSchema: Schema<IJackpot> = new Schema({
-    triggered: { type: Boolean, required: true },
     amountWon: { type: Number, required: true }
 }, { _id: false });
 
 const ScatterSchema: Schema<IScatter> = new Schema({
-    triggered: { type: Boolean, required: true },
     amountWon: { type: Number, required: true },
 }, { _id: false });
 
 const BonusSchema: Schema<IBonus> = new Schema({
-    triggered: { type: Boolean, required: true },
-    bonusGameRounds: { type: Number, required: true },
-    totalBonusWin: { type: Number, required: true },
+    amountWon: { type: Number, required: true },
 }, { _id: false });
 
 const SpecialFeaturesSchema: Schema<ISpecialFeatures> = new Schema({
@@ -32,6 +28,7 @@ const SpinDataSchema: Schema<ISpinData> = new Schema({
 
 const GameSessionSchema: Schema<IGameSession> = new Schema({
     gameId: { type: String, required: true },
+    gameName: { type: String, required: true },
     sessionId: { type: String, required: true },
     entryTime: { type: Date, required: true },
     exitTime: { type: Date, default: null },
@@ -54,5 +51,7 @@ const PlatformSessionSchema: Schema = new Schema({
     currentRTP: { type: Number, default: 0 },
     gameSessions: { type: [GameSessionSchema], default: [] },  // Multiple game sessions as an array
 }, { timestamps: true });
+
+
 
 export const PlatformSessionModel: Model<Document> = mongoose.model<Document>('PlatformSession', PlatformSessionSchema);
