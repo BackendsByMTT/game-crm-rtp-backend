@@ -298,7 +298,6 @@ export function checkForWin(gameInstance: SLPB) {
                     settings.thunderBonus.thunderSpinPayout = payoutOfBonusGame;
                     settings.thunderBonus.isThunderBonus = false;
                     settings.frozenIndices = [];
-                    return;
                 }
             }
             handleBonusGameSpin(gameInstance);

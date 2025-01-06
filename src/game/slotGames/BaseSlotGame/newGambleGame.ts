@@ -140,7 +140,6 @@ export class gambleCardGame {
     this.initialUpdate = false;
     this.sltGame.deductPlayerBalance(this.sltGame.settings._winData.totalWinningAmount)
     this.sltGame.updatePlayerBalance(this.winningCredit);
-
     this.sltGame.playerData.haveWon += this.winningCredit;
     this.sltGame.playerData.currentWining = this.winningCredit;
     let resultData = {

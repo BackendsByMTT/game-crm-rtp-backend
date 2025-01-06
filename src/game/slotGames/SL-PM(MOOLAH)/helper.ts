@@ -39,6 +39,7 @@ export function initializeGameSettings(gameData: any, gameInstance: SLPM) {
     firstReel: [],
     tempReelSym: [],
     freeSpinData: gameData.gameSettings.freeSpinData,
+    jackpotWinSymbols: [],
     jackpot: {
       symbolName: "",
       symbolsCount: 0,
@@ -111,7 +112,7 @@ function handleSpecialSymbols(symbol: any, gameInstance: SLPM) {
 
       break;
     default:
-      break;``
+      break; ``
   }
 }
 
@@ -121,9 +122,9 @@ export function checkForWin(gameInstance: SLPM) {
   try {
     const { settings } = gameInstance;
     if (settings.cascadingNo === 0) {
-    settings.firstReel = [...settings.resultSymbolMatrix.map(row => [...row])]; // Deep copy to preserve the original matrix
-  }
-    
+      settings.firstReel = [...settings.resultSymbolMatrix.map(row => [...row])]; // Deep copy to preserve the original matrix
+    }
+
     const winningLines = [];
     let totalPayout = 0;
     settings.lineData.forEach((line, index) => {
@@ -139,7 +140,7 @@ export function checkForWin(gameInstance: SLPM) {
           settings.Symbols[firstSymbol].Name as specialIcons
         )
       ) {
-        
+
         return;
       }
       const { isWinningLine, matchCount, matchedIndices } = checkLineSymbols(
@@ -203,7 +204,7 @@ export function checkForWin(gameInstance: SLPM) {
         break;
       default:
         console.log("NO PAYLINE MATCH");
-        if (settings.cascadingNo >= 4 && !settings.freeSpin.useFreeSpin && !settings.freeSpin.freeSpinStarted ) {
+        if (settings.cascadingNo >= 4 && !settings.freeSpin.useFreeSpin && !settings.freeSpin.freeSpinStarted) {
           console.log("Cascading Count:", settings.cascadingNo);
           console.log("FreeSpin Data:", settings.freeSpinData);
           const freeSpinData = settings.freeSpinData;
@@ -234,9 +235,9 @@ export function checkForWin(gameInstance: SLPM) {
         settings.tempReelSym = [];
         settings.tempReel = [];
         settings.payoutAfterCascading = 0;
-        settings.cascadingResult=[];
+        settings.cascadingResult = [];
         settings.freeSpin.useFreeSpin = false;
-        
+
         break;
     }
     return winningLines;
@@ -434,7 +435,44 @@ function cascadeSymbols(gameInstance) {
   settings._winData.winningLines = [];
   checkForWin(gameInstance)
 }
+export function checkForJackpot(gameInstance: SLPM) {
+  const { settings, playerData } = gameInstance
 
+  if (settings.jackpot.useJackpot) {
+    var temp = findSymbol(specialIcons.jackpot, gameInstance);
+    if (temp.length > 0) settings.jackpotWinSymbols.push(...temp);
+    if (
+      settings.jackpot.symbolsCount > 0 &&
+      settings.jackpot.symbolsCount == settings.jackpotWinSymbols.length
+    ) {
+      // console.log("!!!!!JACKPOT!!!!!");
+      settings._winData.winningSymbols.push(settings.jackpotWinSymbols);
+      settings._winData.totalWinningAmount += settings.jackpot.defaultAmount * settings.BetPerLines;
+      settings.payoutAfterCascading += settings.jackpot.defaultAmount * settings.BetPerLines;
+      settings._winData.jackpotwin += settings.jackpot.defaultAmount * settings.BetPerLines;
+      playerData.haveWon += settings.jackpot.defaultAmount * settings.BetPerLines;
+    }
+  }
+}
+
+//finding Symbols for special case element
+function findSymbol(SymbolName: string, gameInstance: SLPM) {
+  const { settings } = gameInstance
+  let symbolId: number = -1;
+  let foundArray = [];
+  settings.currentGamedata.Symbols.forEach((element) => {
+    if (SymbolName == element.Name) symbolId = element.Id;
+  });
+  console.log(settings.resultSymbolMatrix)
+  for (let i = 0; i < settings.resultSymbolMatrix.length; i++) {
+    for (let j = 0; j < settings.resultSymbolMatrix[i].length; j++) {
+      console.log(settings.resultSymbolMatrix[i][j])
+      if (settings.resultSymbolMatrix[i][j] == symbolId)
+        foundArray.push(j.toString() + "," + i.toString());
+    }
+  }
+  return foundArray;
+}
 /**
  * Sends the initial game and player data to the client.
  * @param gameInstance - The instance of the SLCM class containing the game settings and player data.
@@ -478,6 +516,7 @@ export function makeResultJson(gameInstance: SLPM) {
         isCascading: settings.hasCascading,
         isFreeSpin: settings.freeSpin.useFreeSpin,
         freeSpinCount: settings.freeSpin.freeSpinCount,
+
       },
       PlayerData: {
         Balance: Balance,

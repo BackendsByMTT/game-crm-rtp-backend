@@ -1,5 +1,6 @@
 
 
+import { log } from "console";
 import { ScatterPayEntry, BonusPayEntry, specialIcons, bonusGameType, ResultType } from "../../Utils/gameUtils";
 import BaseSlotGame from "./BaseSlotGame";
 import { BonusGame, runMiniSpin } from "./BonusGame";
@@ -108,10 +109,22 @@ export class CheckResult {
 
     private checkForFreeSpin() {
         let temp = this.findSymbol(specialIcons.FreeSpin);
-        if (temp.length > (5 - this.currentGame.settings.freeSpin.freeSpinMuiltiplier.length)) {
+        if (temp.length > (5 - this.currentGame.settings.freeSpin.freeSpinMuiltiplier.length) && temp.length <=5) {
             console.log("!!!! FREEE SPINNN !!!!!"
             );
             const freeSpins = this.accessData(this.currentGame.settings.freeSpin.symbolID, temp.length)
+            this.currentGame.settings.freeSpin.freeSpinStarted = true;
+            this.currentGame.settings.freeSpin.freeSpinsAdded = true;
+            this.currentGame.settings.freeSpin.freeSpinCount += freeSpins;
+            this.currentGame.playerData.totalSpin += freeSpins;
+            this.currentGame.playerData.rtpSpinCount += freeSpins;
+            this.currentGame.settings._winData.winningSymbols.push(temp);
+        }
+        else if (temp.length > 5)
+        {
+            console.log("!!!! FREEE SPINNN !!!!!"
+            );
+            const freeSpins = this.accessData(this.currentGame.settings.freeSpin.symbolID, 5)
             this.currentGame.settings.freeSpin.freeSpinStarted = true;
             this.currentGame.settings.freeSpin.freeSpinsAdded = true;
             this.currentGame.settings.freeSpin.freeSpinCount += freeSpins;
@@ -268,12 +281,24 @@ export class CheckResult {
             console.log("SCATTER2")
             let temp = this.findSymbol(specialIcons.scatter);
 
-            if (temp.length > (5 - this.currentGame.settings.scatter.multiplier.length)) {
+            if (temp.length > (5 - this.currentGame.settings.scatter.multiplier.length) && temp.length <=5) {
+                console.log(temp.length,"dnbdjbjjd");
+                
                 const winningAmount = this.accessData(this.currentGame.settings.scatter.symbolID, temp.length);
                 this.currentGame.settings._winData.totalWinningAmount += winningAmount * this.currentGame.settings.BetPerLines;
                 this.currentGame.settings._winData.winningSymbols.push(temp);
 
+
             }
+            else if(temp.length> 5)
+            {
+                console.log("sfgshfuivhmduerhjidh");
+                const winningAmount = this.accessData(this.currentGame.settings.scatter.symbolID, 5);
+                this.currentGame.settings._winData.totalWinningAmount += winningAmount * this.currentGame.settings.BetPerLines;
+                this.currentGame.settings._winData.winningSymbols.push(temp);
+                
+            }
+            
         }
     }
 
@@ -282,11 +307,13 @@ export class CheckResult {
         if (this.useJackpot) {
             var temp = this.findSymbol(specialIcons.jackpot);
             if (temp.length > 0) this.jackpotWinSymbols.push(...temp);
+            console.log(this.jackpot.symbolsCount ,"jahfjhsuj");
+            console.log("temp",temp.length);
+            
             if (
-                this.jackpot.symbolsCount > 0 &&
-                this.jackpot.symbolsCount == this.jackpotWinSymbols.length
+                temp.length >= this.jackpot.symbolsCount  
             ) {
-                // console.log("!!!!!JACKPOT!!!!!");
+                console.log("!!!!!JACKPOT!!!!!");
                 this.currentGame.settings._winData.winningSymbols.push(this.jackpotWinSymbols);
                 this.currentGame.settings._winData.totalWinningAmount += this.jackpot.defaultAmount * this.currentGame.settings.BetPerLines;;
                 this.currentGame.settings._winData.jackpotwin += this.jackpot.defaultAmount * this.currentGame.settings.BetPerLines;;
@@ -311,8 +338,8 @@ export class CheckResult {
 
     makeResultJson(isResult: ResultType, iconsToFill: number[][] = []) {
         //TODO : Try to send the jackpot win data without initializie a variable;
-        this.currentGame.settings._winData.totalWinningAmount =
-            Math.round(this.currentGame.settings._winData.totalWinningAmount * 100) / 100;
+        const totalWining = this.currentGame.settings._winData.totalWinningAmount
+        this.currentGame.settings._winData.totalWinningAmount = Number(totalWining.toFixed(3));
         const ResultData = {
             GameData: {
                 ResultReel: this.currentGame.settings.resultSymbolMatrix,
