@@ -174,7 +174,7 @@ export function calculatePayoutOfBonusGame(gameInstance: SLPB) {
 
     //handle grand prize
     if ((settings.isGrandPrize)) {
-        const payout = settings.grandMultiplier * settings.currentBet;
+        const payout = settings.grandMultiplier * settings.BetPerLines;
         totalPayout += payout;
     }
 

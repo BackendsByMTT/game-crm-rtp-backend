@@ -98,6 +98,7 @@ export function sendInitData(gameInstance: SLTM) {
     GameData: {
       Reel: reels,
       Bets: gameInstance.settings.currentGamedata.bets,
+      FreespinBonusCount:gameInstance.settings.freeSpinIncrement,
     },
     UIData: UiInitData,
     PlayerData: {

@@ -93,7 +93,7 @@ export class SLPB {
                 this.sendError("Low Balance");
                 return;
             }
-            if (!this.settings.freeSpin.useFreeSpin) {
+            if ((!this.settings.freeSpin.useFreeSpin) && (!this.settings.thunderBonus.isThunderBonus)) {
                 await this.deductPlayerBalance(this.settings.currentBet);
                 this.playerData.totalbet += this.settings.currentBet;
             }

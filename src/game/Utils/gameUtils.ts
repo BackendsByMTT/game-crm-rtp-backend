@@ -2,6 +2,9 @@
 import { Player } from "../../dashboard/users/userModel";
 import { UserData } from "../../utils/globalTypes";
 import crypto from 'crypto';
+import * as fs from 'fs';
+import { generatePaytables } from "../KenoGames/KenoBaseGame/rtp";
+
 export enum specialIcons {
     bonus = "Bonus",
     scatter = "Scatter",
@@ -240,3 +243,52 @@ export function generatetrueRandomNumber(max) {
 function generateUniqueSeed(): number {
     return Math.floor(Date.now() * Math.random() + performance.now());
 }
+
+/**
+ * Function to generate paytable JSON file
+ * @param {number} N - The population size
+ * @param {number} n - The number of draws
+ * @param {number} maxPicks - The maximum number of picks
+ * @param {number} desiredRTP - The desired RTP
+ * @param {(k: number, picks: number, desiredRTP: number) => number} payoutMultiplier - The function to calculate the payout multiplier
+ * @param {string} outputPath - The path to save the JSON file
+ */
+export function generatePaytableJSON(
+    N: number,
+    n: number,
+    maxPicks: number,
+    desiredRTP: number,
+    payoutMultiplier: (k: number, picks: number, desiredRTP: number) => number,
+    outputPath: string
+  ) {
+    const { paytables } = generatePaytables(N, n, maxPicks, desiredRTP, payoutMultiplier);
+  
+    const payoutArray: number[][] = [];
+  
+    for (let picks = 1; picks <= maxPicks; picks++) {
+      const payoutsForPicks = paytables[picks].map(entry => entry.payout).slice(1);
+      payoutArray.push(payoutsForPicks);
+  
+    }
+  
+    const jsonData = {
+      desiredRTP,
+      payoutArray
+    };
+  
+    fs.writeFileSync(outputPath, JSON.stringify(jsonData, null, 2), 'utf-8');
+  
+    console.log(`Paytable JSON file successfully generated at: ${outputPath}`);
+  }
+
+
+  export function writeMultipleArraysToCSV(filename: string, data: number[][]): void {
+    try {
+      const csvContent = data.map(row => row.join(',')).join('\n');
+      fs.writeFileSync(filename, csvContent);
+      console.log(`Successfully wrote data to ${filename}`);
+    } catch (error) {
+      console.error('Error writing CSV file:', error);
+      throw error;
+    }
+  }
