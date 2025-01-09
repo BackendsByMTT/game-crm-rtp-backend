@@ -340,13 +340,14 @@ export function checkForWin(gameInstance: SLSM) {
  * @param gameInstance - The instance of the SLCM class that manages the game logic.
  * @returns An array of valid winning symbols where each entry is a tuple of the symbol ID and its count.
  */
-
+ 
 function countOccurenceOfSymbolsAndIndices(gameInstance: SLSM) {
     const { settings } = gameInstance;
     const counts: Record<string | number, number> = {};
     const indices: Record<string | number, [number, number][]> = {};
     let wildCount = 0;
     let combinedIndices: Set<string> = new Set();
+    settings.stickyBonusValue.splice(1);
 
     // count symbols and track their indices
     settings.resultSymbolMatrix.forEach((row, rowIndex) => {
@@ -355,10 +356,20 @@ function countOccurenceOfSymbolsAndIndices(gameInstance: SLSM) {
                 wildCount++;
                 if (!indices[settings.wild.SymbolID]) indices[settings.wild.SymbolID] = [];
                 indices[settings.wild.SymbolID].push([rowIndex, colIndex]);
-            } else {
+            } 
+            else {
                 counts[num] = (counts[num] || 0) + 1;
                 if (!indices[num]) indices[num] = [];
                 indices[num].push([rowIndex, colIndex]);
+            }
+        });
+    });
+    settings.resultSymbolMatrix.forEach((row, rowIndex) => {
+        row.forEach((num: number, colIndex: number) => {
+            if (num === settings.bonus.SymbolID) {
+                const stickyCount = 0;
+                const prizeValue = getRandomValue(gameInstance, 'prize')
+                settings.stickyBonusValue.push({ position: [colIndex, rowIndex], prizeValue: prizeValue, value: stickyCount, symbol: num });
             }
         });
     });
@@ -683,7 +694,13 @@ export function makeResultJson(gameInstance: SLSM) {
                 frozenIndices: settings.frozenIndices,
                 isGrandPrize: settings.isGrandPrize,
                 isMoonJackpot: settings.isMoonJackpot,
-                moonMysteryData: settings.moonMysteryData,
+                moonMysteryData: settings.moonMysteryData.map((item) => [
+                    item.id,           
+                    ...item.position,   
+                    item.prizeValue,   
+                    item.symbol       
+                ]),
+                
                 isStickyBonus: settings.isStickyBonus,
                 stickyBonusValue: settings.stickyBonusValue,
                 isAllWild: settings.isAllWild,
@@ -697,8 +714,7 @@ export function makeResultJson(gameInstance: SLSM) {
             }
         };
         gameInstance.sendMessage('ResultData', sendData);
-
-        console.log(sendData, "send Data");
+        
 
     } catch (error) {
         console.error("Error generating result JSON or sending message:", error);

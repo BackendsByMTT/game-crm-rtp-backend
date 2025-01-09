@@ -302,7 +302,6 @@ export function checkForWin(gameInstance: SLPB) {
             }
             handleBonusGameSpin(gameInstance);
         } else {
-            checkForThunderBonusGame(gameInstance);
             if (settings.freeSpin.useFreeSpin) {
                 switch (true) {
                     case settings.isArthurBonus:
@@ -321,6 +320,7 @@ export function checkForWin(gameInstance: SLPB) {
             } else {
                 checkForFreeSpin(gameInstance);
             }
+            checkForThunderBonusGame(gameInstance);
 
 
             settings.lineData.forEach((line, index) => {

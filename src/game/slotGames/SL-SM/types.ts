@@ -17,6 +17,7 @@ export interface FrozenIndex {
 
  
 export interface bonusSymbol {
+    id?:number;
     position: [number, number];
     prizeValue:number;
     symbol:number|string;
