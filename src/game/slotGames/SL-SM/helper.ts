@@ -256,7 +256,13 @@ export function checkForWin(gameInstance: SLSM) {
         let totalPayout = 0;
         if (!settings.freeSpin.useFreeSpin) {
             // handle stickybonussymbol and freeze
-            if (settings.stickyBonusValue.length > 0) {
+            if (settings.stickyBonusValue[0]?.value > 0) {
+
+                settings.stickyBonusValue = settings.stickyBonusValue.filter(
+                    frozenObject => frozenObject.value !== 0
+                );
+                handleStickySymbol(gameInstance);
+
                 settings.stickyBonusValue[0].value--;
                 freezeSymbolonSpecificIndex(gameInstance);
                 if (settings.stickyBonusValue[0].value <= 0) {
@@ -303,6 +309,8 @@ export function checkForWin(gameInstance: SLSM) {
             handleBonusGameSpin(gameInstance);
         }
 
+        
+
         // console.log(gameInstance.settings.bonusSymbolValue, "bonus symbol value");
         // console.log(gameInstance.settings.stickyBonusValue, "stcky symbol value");
         
@@ -347,8 +355,9 @@ function countOccurenceOfSymbolsAndIndices(gameInstance: SLSM) {
     const indices: Record<string | number, [number, number][]> = {};
     let wildCount = 0;
     let combinedIndices: Set<string> = new Set();
-    settings.stickyBonusValue.splice(1);
-
+    settings.stickyBonusValue = settings.stickyBonusValue.filter(
+        frozenObject => frozenObject.symbol !== settings.bonus.SymbolID 
+    );
     // count symbols and track their indices
     settings.resultSymbolMatrix.forEach((row, rowIndex) => {
         row.forEach((num: number, colIndex: number) => {
@@ -359,7 +368,7 @@ function countOccurenceOfSymbolsAndIndices(gameInstance: SLSM) {
             } 
             else {
                 counts[num] = (counts[num] || 0) + 1;
-                if (!indices[num]) indices[num] = [];
+                if (!indices[num]) indices[num] = []; 
                 indices[num].push([rowIndex, colIndex]);
             }
         });
@@ -533,18 +542,74 @@ function handleStickyBonus(gameInstance: SLSM) {
             }
         });
     });
+    settings.stickyBonusValue = stickyBonusIndices;
+    // console.log(settings.stickyBonusValue, "DD"); 
 
-    // if sticky bonus symbols is there, find highest sticky bonus
-    if (stickyBonusIndices.length > 0) {
-        const maxFrozenObject = stickyBonusIndices.reduce((max, frozenObject) =>
+    // If sticky bonus symbols exist, find the highest sticky bonus and set others to 0
+    if (settings.stickyBonusValue.length > 0) {
+        const maxFrozenObject = settings.stickyBonusValue.reduce((max, frozenObject) =>
             frozenObject.value > max.value ? frozenObject : max,
-            stickyBonusIndices[0]
+            settings.stickyBonusValue[0]
         );
-        stickyBonusValue.push(maxFrozenObject);
+
+        settings.stickyBonusValue = [
+            maxFrozenObject,
+            ...settings.stickyBonusValue
+                .filter(frozenObject => frozenObject !== maxFrozenObject)
+                .map(frozenObject => ({ ...frozenObject, value: 0, prizeValue: 0 }))
+        ];
+
         settings.isStickyBonus = true;
     }
-    // console.log(stickyBonusValue, "FROZEN INDEX");    
+    // console.log(settings.stickyBonusValue, "FROZEN INDEX");
 }
+
+
+function handleStickySymbol(gameInstance: SLSM) {
+    const { settings } = gameInstance;
+    const { resultSymbolMatrix, stickyBonus } = settings;
+    let stickyBonusIndices: FrozenIndex[] = [];
+
+    // Check if the sticky bonus symbol is defined
+    if (!stickyBonus?.SymbolID) {
+        console.warn("Sticky Bonus SymbolID is not defined.");
+        return;
+    }
+
+    // Iterate through the result symbol matrix to identify sticky bonus symbols
+    resultSymbolMatrix.forEach((row, rowIndex) => {
+        row.forEach((symbol, colIndex) => {
+            if (symbol === stickyBonus.SymbolID) {
+                const prizeValue = getRandomValue(gameInstance, 'prize');
+                const position: [number, number] = [colIndex, rowIndex];
+
+                // Check if the position already exists in stickyBonusValue
+                const alreadyExists = settings.stickyBonusValue.some(
+                    (existing) => existing.position[0] === position[0] && existing.position[1] === position[1]
+                );
+
+                // If not, add it to the indices
+                if (!alreadyExists) {
+                    stickyBonusIndices.push({
+                        position,
+                        prizeValue,
+                        value: 0,
+                        symbol,
+                    });
+                }
+            }
+        });
+    });
+
+    // Add all unique sticky bonus symbols to stickyBonusValue
+    if (stickyBonusIndices.length > 0) {
+        stickyBonusIndices.forEach((frozenObject) => {
+            settings.stickyBonusValue.push(frozenObject);
+        });
+    }
+
+}
+
 
 /**
  * Retrieves a random value based on the specified type and its associated probabilities.
@@ -714,7 +779,6 @@ export function makeResultJson(gameInstance: SLSM) {
             }
         };
         gameInstance.sendMessage('ResultData', sendData);
-        
 
     } catch (error) {
         console.error("Error generating result JSON or sending message:", error);
