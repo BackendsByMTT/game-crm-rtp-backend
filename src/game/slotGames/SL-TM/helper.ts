@@ -1,6 +1,6 @@
 import { SymbolType, GameResult, WinningCombination, SpecialSymbols } from './types';
 import { WinData } from "../BaseSlotGame/WinData";
-import { convertSymbols, UiInitData,shuffleArray } from '../../Utils/gameUtils';
+import { convertSymbols, UiInitData, shuffleArray } from '../../Utils/gameUtils';
 import { precisionRound } from '../../../utils/utils';
 import { SLTM } from './TimeMachineBase';
 
@@ -36,6 +36,8 @@ export function initializeGameSettings(gameData: any, gameInstance: SLTM) {
       SymbolId: gameInstance.currentGameData.gameSettings.Symbols.find((sym: SymbolType) => sym.Name == SpecialSymbols.WILD).Id
       ,
       SymbolName: SpecialSymbols.WILD,
+      cutoffLevel: gameSettings.wildCutoffLevel,
+      subs: gameSettings.wildSubs
     },
     freeSpin: {
       SymbolId: gameInstance.currentGameData.gameSettings.Symbols.find((sym: SymbolType) => sym.Name == SpecialSymbols.FREE_SPIN).Id
@@ -43,7 +45,6 @@ export function initializeGameSettings(gameData: any, gameInstance: SLTM) {
       SymbolName: SpecialSymbols.FREE_SPIN,
     }
   };
-
   // Add WinData separately to avoid circular reference in logging
   settings._winData = new WinData(gameInstance);
 
@@ -98,7 +99,7 @@ export function sendInitData(gameInstance: SLTM) {
     GameData: {
       Reel: reels,
       Bets: gameInstance.settings.currentGamedata.bets,
-      FreespinBonusCount:gameInstance.settings.freeSpinIncrement,
+      FreespinBonusCount: gameInstance.settings.freeSpinIncrement,
     },
     UIData: UiInitData,
     PlayerData: {
@@ -140,6 +141,28 @@ export function checkWin(gameInstance: SLTM): { payout: number; winningCombinati
     let winningCombinations: WinningCombination[] = [];
 
     settings.isLevelUp = false
+
+    //NOTE: wild sub 
+    //1 check if level above cutoff
+    //2 check if there are wild symbols
+    //3 substitute wild symbols
+    // console.log(settings.level, settings.wild.cutoffLevel);
+    
+
+    if (settings.level >= settings.wild.cutoffLevel) {
+      let newMatrix = JSON.parse(JSON.stringify(settings.resultSymbolMatrix))
+      settings.resultSymbolMatrix.forEach((row, y) => {
+        row.forEach((symbolId, x) => {
+          if (isWild(symbolId, settings.wild.SymbolId)) {
+            newMatrix[y][x] = getRandomIndex(settings.wild.subs)
+          }
+        })
+      })
+      settings.resultSymbolMatrix = newMatrix
+    }
+
+
+
 
     //NOTE: freespin plus one substitute
     if (settings.isFreeSpin) {
