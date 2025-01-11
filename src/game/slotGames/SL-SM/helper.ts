@@ -265,7 +265,7 @@ export function checkForWin(gameInstance: SLSM) {
 
                 settings.stickyBonusValue[0].value--;
                 freezeSymbolonSpecificIndex(gameInstance);
-                if (settings.stickyBonusValue[0].value <= 0) {
+                if (settings.stickyBonusValue[0].value < 0) {
                     //remove stickyBonusSymbol
                     settings.stickyBonusValue.splice(0, 1);
                     // console.log("After Decrementedto zero:", settings.stickyBonusValue.length);
@@ -779,6 +779,13 @@ export function makeResultJson(gameInstance: SLSM) {
             }
         };
         gameInstance.sendMessage('ResultData', sendData);
+
+        console.log(sendData.GameData.stickyBonusValue, "send Data");
+        console.log(sendData.GameData.isFreeSpin, "send Data");
+
+        console.log(sendData.GameData.moonMysteryData, "send Data");
+
+        
 
     } catch (error) {
         console.error("Error generating result JSON or sending message:", error);
