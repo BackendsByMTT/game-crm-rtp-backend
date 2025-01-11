@@ -261,7 +261,14 @@ function runBonusGame(bonusSymbolCount: number, gameInstance: SLSR) {
     settings.selectedMultiplier = selectMultiplierFromArray(settings.multiplierArray, settings.multiplierProbabilities);
     console.log("Selected Multiplier: ", settings.selectedMultiplier);
 
-    settings.shuffledBonusValues = shuffleArray(selectedBonusValues);
+    settings.shuffledBonusValues = [...selectedBonusValues]; 
+    for (let i = settings.shuffledBonusValues.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [settings.shuffledBonusValues[i], settings.shuffledBonusValues[j]] = [
+        settings.shuffledBonusValues[j],
+        settings.shuffledBonusValues[i],
+      ];
+    }
     console.log("Shuffled Bonus Values: ", settings.shuffledBonusValues);
 
     const sumOfValues = settings.shuffledBonusValues.slice(0, -1).reduce((sum, value) => sum + value, 0);
