@@ -12,12 +12,12 @@ export class RandomResultGenerator {
     }
 
 
-    // matrix.pop();
-    // matrix.pop();
-    // matrix.pop();
-    // matrix.push(['10', '6', '12', '0', '4'])
-    // matrix.push(['12', '12', '12', '12', '12'])
-    // matrix.push(['5', '8', '1', '5', '1'])
+    matrix.pop();
+    matrix.pop();
+    matrix.pop();
+    matrix.push(['8', '8', '8', '8', '8'])
+    matrix.push(['5', '3', '2', '1', '1'])
+    matrix.push(['5', '3', '1', '5', '1'])
     matrix.forEach(row => console.log(row.join(' ')));
     current.settings.resultReelIndex = matrix;
     current.settings.resultSymbolMatrix = matrix;
