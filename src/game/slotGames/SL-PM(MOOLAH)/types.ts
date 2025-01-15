@@ -37,6 +37,7 @@ export interface SLPMSETTINGS {
         defaultAmount: number;
         increaseValue: number;
         useJackpot: boolean;
+        jackpotCount: number;
     },
     freeSpin: {
         symbolID: string,

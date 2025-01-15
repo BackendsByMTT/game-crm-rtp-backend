@@ -47,6 +47,7 @@ export function initializeGameSettings(gameData: any, gameInstance: SLPM) {
       defaultAmount: 0,
       increaseValue: 0,
       useJackpot: false,
+      jackpotCount: 0
     },
     freeSpin: {
       symbolID: "-1",
@@ -124,7 +125,12 @@ export function checkForWin(gameInstance: SLPM) {
     if (settings.cascadingNo === 0) {
       settings.firstReel = [...settings.resultSymbolMatrix.map(row => [...row])]; // Deep copy to preserve the original matrix
     }
+    if (settings.jackpot?.jackpotCount == 1) {
 
+      console.info("No jackpot to check as count us already 1 !");
+    } else {
+      checkForJackpot(gameInstance);
+    }
     const winningLines = [];
     let totalPayout = 0;
     settings.lineData.forEach((line, index) => {
@@ -156,7 +162,8 @@ export function checkForWin(gameInstance: SLPM) {
             gameInstance
           );
           settings.lastReel = settings.resultSymbolMatrix;
-          console.log(settings.lastReel, 'lastReel')
+
+
           switch (true) {
             case symbolMultiplier > 0:
               totalPayout += symbolMultiplier;
@@ -167,12 +174,12 @@ export function checkForWin(gameInstance: SLPM) {
                 multiplier: symbolMultiplier,
                 matchCount,
               });
-              console.log(`Line ${index + 1}:`, line);
-              console.log(
-                `Payout for Line ${index + 1}:`,
-                "payout",
-                symbolMultiplier
-              );
+              // console.log(`Line ${index + 1}:`, line);
+              // console.log(
+              //   `Payout for Line ${index + 1}:`,
+              //   "payout",
+              //   symbolMultiplier
+              // );
               const formattedIndices = matchedIndices.map(({ col, row }) => `${col},${row}`);
               const validIndices = formattedIndices.filter(
                 (index) => index.length > 2
@@ -205,8 +212,6 @@ export function checkForWin(gameInstance: SLPM) {
       default:
         console.log("NO PAYLINE MATCH");
         if (settings.cascadingNo >= 4 && !settings.freeSpin.useFreeSpin && !settings.freeSpin.freeSpinStarted) {
-          console.log("Cascading Count:", settings.cascadingNo);
-          console.log("FreeSpin Data:", settings.freeSpinData);
           const freeSpinData = settings.freeSpinData;
           for (let i = 0; i < freeSpinData.length; i++) {
             const [requiredCascadingCount, awardedFreeSpins] = freeSpinData[i];
@@ -237,7 +242,9 @@ export function checkForWin(gameInstance: SLPM) {
         settings.payoutAfterCascading = 0;
         settings.cascadingResult = [];
         settings.freeSpin.useFreeSpin = false;
-
+        settings.jackpot.jackpotCount = 0;
+        settings._winData.jackpotwin = 0;
+        settings._winData.winningSymbols = []
         break;
     }
     return winningLines;
@@ -415,6 +422,8 @@ function cascadeSymbols(gameInstance) {
       }
     }
     assignedSymbolsByCol.push(assignedSymbols);
+    console.log(flattenedReel, "newreel");
+
   }
   data.symbolsToFill = assignedSymbolsByCol;
   data.lineToEmit = settings._winData.winningLines;
@@ -429,50 +438,113 @@ function cascadeSymbols(gameInstance) {
   data.winingSymbols = [];
   data.currentWining = 0;
   settings.resultSymbolMatrix = flattenedReel;
-  settings._winData.winningSymbols = [];
+  settings._winData.winningSymbols = []
   settings.tempReelSym = [];
   settings.tempReel = [];
   settings._winData.winningLines = [];
-  checkForWin(gameInstance)
-}
-export function checkForJackpot(gameInstance: SLPM) {
-  const { settings, playerData } = gameInstance
+  checkForWin(gameInstance);
 
-  if (settings.jackpot.useJackpot) {
-    var temp = findSymbol(specialIcons.jackpot, gameInstance);
-    if (temp.length > 0) settings.jackpotWinSymbols.push(...temp);
-    if (
-      settings.jackpot.symbolsCount > 0 &&
-      settings.jackpot.symbolsCount == settings.jackpotWinSymbols.length
-    ) {
-      // console.log("!!!!!JACKPOT!!!!!");
-      settings._winData.winningSymbols.push(settings.jackpotWinSymbols);
-      settings._winData.totalWinningAmount += settings.jackpot.defaultAmount * settings.BetPerLines;
-      settings.payoutAfterCascading += settings.jackpot.defaultAmount * settings.BetPerLines;
-      settings._winData.jackpotwin += settings.jackpot.defaultAmount * settings.BetPerLines;
-      playerData.haveWon += settings.jackpot.defaultAmount * settings.BetPerLines;
+}
+/**
+ * Evaluates and processes jackpot conditions for the game.
+ * If the jackpot is triggered, updates game settings, player data, and win data accordingly.
+ * 
+ * @param {SLPM} gameInstance - The instance of the game containing settings and player data.
+ */
+export function checkForJackpot(gameInstance) {
+  try {
+    const { settings, playerData } = gameInstance;
+
+    console.log("!!!!! CHECK JACKPOT!!!!!");
+
+    if (settings.jackpot.useJackpot) {
+      const jackpotSymbols = findSymbol(specialIcons.jackpot, gameInstance);
+      switch (true) {
+
+        case jackpotSymbols.length >= 5:
+
+          settings.jackpotWinSymbols.push(...jackpotSymbols);
+
+          console.log("jackpotWinSymbols", settings.jackpotWinSymbols.length);
+        case settings.jackpot.symbolsCount > 0 &&
+          settings.jackpotWinSymbols.length == settings.jackpot.symbolsCount:
+          console.log("!!!!!JACKPOT WON!!!!!");
+          settings.jackpot.jackpotCount = 1;
+          const jackpotAmount = settings.jackpot.defaultAmount * settings.BetPerLines;
+          settings._winData.winningSymbols.push(settings.jackpotWinSymbols);
+          settings._winData.totalWinningAmount += jackpotAmount;
+          settings.payoutAfterCascading += jackpotAmount;
+          settings._winData.jackpotwin += jackpotAmount;
+          playerData.haveWon += jackpotAmount;
+          break;
+
+        default:
+          console.info("No jackpot conditions met.");
+          break;
+      }
     }
+  } catch (error) {
+    console.error(`An error occurred in checkForJackpot: ${error.message}`);
   }
 }
 
-//finding Symbols for special case element
-function findSymbol(SymbolName: string, gameInstance: SLPM) {
-  const { settings } = gameInstance
-  let symbolId: number = -1;
-  let foundArray = [];
-  settings.currentGamedata.Symbols.forEach((element) => {
-    if (SymbolName == element.Name) symbolId = element.Id;
-  });
-  console.log(settings.resultSymbolMatrix)
-  for (let i = 0; i < settings.resultSymbolMatrix.length; i++) {
-    for (let j = 0; j < settings.resultSymbolMatrix[i].length; j++) {
-      console.log(settings.resultSymbolMatrix[i][j])
-      if (settings.resultSymbolMatrix[i][j] == symbolId)
-        foundArray.push(j.toString() + "," + i.toString());
+
+/**
+ * Searches for the coordinates of a specific symbol in the game's result matrices.
+ * The function adapts based on whether the game uses cascading symbols.
+ * 
+ * @param {string} symbolName - The name of the symbol to find.
+ * @param {SLPM} gameInstance - The instance of the game containing settings and data.
+ * @returns {string[]} An array of coordinate strings ("x,y") where the symbol is found.
+ */
+function findSymbol(symbolName, gameInstance) {
+  try {
+    const { settings } = gameInstance;
+    let symbolId = -1;
+    const foundArray = [];
+
+    // Find the symbol ID based on the provided name.
+    const targetSymbol = settings.currentGamedata.Symbols.find(
+      (symbol) => symbol.Name === symbolName
+    );
+
+    if (targetSymbol) {
+      symbolId = targetSymbol.Id;
+    } else {
+      console.warn(`Symbol "${symbolName}" not found in game data.`);
+      return foundArray;
     }
+
+    // Determine the matrix to search based on cascading settings.
+    const matrixToSearch = settings.hasCascading
+      ? settings.lastReel
+      : settings.resultSymbolMatrix;
+
+    if (!Array.isArray(matrixToSearch) || matrixToSearch.length === 0) {
+      console.error("Matrix to search is not valid or empty.");
+      return foundArray;
+    }
+
+    // Iterate through the matrix to find symbol coordinates.
+    for (let row = 0; row < matrixToSearch.length; row++) {
+      for (let col = 0; col < matrixToSearch[row].length; col++) {
+        if (matrixToSearch[row][col] === symbolId) {
+          foundArray.push(`${col},${row}`);
+        }
+      }
+    }
+
+    if (foundArray.length === 0) {
+      console.info(`Symbol "${symbolName}" with ID ${symbolId} not found in the matrix.`);
+    }
+
+    return foundArray;
+  } catch (error) {
+    console.error(`An error occurred while finding the symbol: ${error.message}`);
+    return [];
   }
-  return foundArray;
 }
+
 /**
  * Sends the initial game and player data to the client.
  * @param gameInstance - The instance of the SLCM class containing the game settings and player data.
