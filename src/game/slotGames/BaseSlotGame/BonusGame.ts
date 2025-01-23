@@ -191,8 +191,10 @@ const generateInnerMatrix = (symbols: number[], miniSlotProb: number[]): number[
  * @param betPerLines - The amount of bet per line.
  * @returns An object containing the result of the mini spin, including the inner matrix, outer ring symbols, winnings, and total win amount.
  */
+
 export function runMiniSpin(bonus: any, symCnt: any, betPerLines: number): any {
   try {
+
 
     if (bonus.noOfItem < symCnt) {
       return;
