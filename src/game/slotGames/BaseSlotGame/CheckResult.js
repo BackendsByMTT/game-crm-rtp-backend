@@ -60,7 +60,7 @@ class CheckResult {
             if (this.currentGame.settings.currentGamedata.bonus.type == gameUtils_1.bonusGameType.miniSpin) {
                 const betPerLines = this.currentGame.settings.BetPerLines;
                 this.currentGame.settings.currentGamedata.bonus.noOfItem = temp.length;
-                const result = (0, BonusGame_1.runMiniSpin)(this.currentGame.settings.currentGamedata.bonus, betPerLines);
+                const result = (0, BonusGame_1.runMiniSpin)(this.currentGame.settings.currentGamedata.bonus, this.currentGame.settings.bonus.symbolCount, betPerLines);
                 this.bonusResult = result;
                 this.currentGame.settings._winData.totalWinningAmount += result.totalWinAmount;
             }

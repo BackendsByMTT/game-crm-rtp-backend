@@ -101,6 +101,7 @@ class SLPSF {
                 (0, helper_1.checkForTrumpFreeSpin)(this);
                 const winAmount = this.playerData.currentWining;
                 platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', winAmount);
+                this.playerData.haveWon += winAmount;
                 (0, helper_1.makeResultJson)(this);
                 this.updatePlayerBalance(this.playerData.currentWining);
                 //clear json

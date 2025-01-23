@@ -292,6 +292,9 @@ function checkForWin(gameInstance) {
         gameInstance.updatePlayerBalance(gameInstance.playerData.currentWining);
         // Reset game state after payout
         makeResultJson(gameInstance);
+        if (settings.isMoonJackpot) {
+            settings.isMoonJackpot = false;
+        }
         settings._winData.totalWinningAmount = 0;
         gameInstance.playerData.currentWining = 0;
         settings.freeSpin.freeSpinPayout = 0;

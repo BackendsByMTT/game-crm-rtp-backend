@@ -46,7 +46,7 @@ class BonusGame {
     }
     setRandomStopIndex() {
         let amount = 0;
-        console.log("bonus: ", this.parent.settings.currentGamedata.bonus);
+        // console.log("bonus: ", this.parent.settings.currentGamedata.bonus);
         if (this.parent.settings.bonus.start) {
             const bonusType = this.parent.settings.currentGamedata.bonus.type;
             const betPerLine = this.parent.settings.BetPerLines;
@@ -82,7 +82,7 @@ class BonusGame {
                 selectedIndex[layerIndex] = this.getRandomPayoutIndex(layerPayOutProb);
                 const selectedPayOut = layerPayOuts[selectedIndex[layerIndex]];
                 if (selectedPayOut === 0) {
-                    console.log(`Payout is 0 at layer ${layerIndex}, exiting...`);
+                    // console.log(`Payout is 0 at layer ${layerIndex}, exiting...`);
                     break;
                 }
                 totalWinAmount += this.parent.settings.BetPerLines * selectedPayOut;
@@ -152,11 +152,31 @@ const generateInnerMatrix = (symbols, miniSlotProb) => {
  * @param betPerLines - The amount of bet per line.
  * @returns An object containing the result of the mini spin, including the inner matrix, outer ring symbols, winnings, and total win amount.
  */
-function runMiniSpin(bonus, betPerLines) {
+function runMiniSpin(bonus, symCnt, betPerLines) {
     try {
-        if (bonus.noOfItem < bonus.symbolCount)
+        if (bonus.noOfItem < symCnt) {
             return;
-        let lives = bonus.noOfItem > 5 ? 3 : bonus.noOfItem - ((bonus.winningValue).length + 1);
+        }
+        //NOTE: 
+        //lives should be dynamic 
+        //noofitems - match count 
+        //symcount - 3 
+        //winningValue - [1,2,3]
+        //so with 3 match count 1 life 
+        //3 - 1 life 
+        //4 - 2
+        //5 - 3
+        let lives = 0;
+        // let lives = bonus.noOfItem > 5 ? 3 : bonus.noOfItem - ((bonus.winningValue).length + 1);
+        if (bonus.noOfItem >= symCnt + 2) {
+            lives = bonus.winningValue[2];
+        }
+        else if (bonus.noOfItem == symCnt + 1) {
+            lives = bonus.winningValue[1];
+        }
+        else if (bonus.noOfItem == symCnt) {
+            lives = bonus.winningValue[0];
+        }
         let totalWinAmount = 0;
         const { symbols, miniSlotProb, outerRingProb, payOut } = bonus;
         let result = {
@@ -165,7 +185,6 @@ function runMiniSpin(bonus, betPerLines) {
             totalWinAmount: 0,
             winings: [],
         };
-        console.log(`Lives: ${lives}`);
         while (lives > 0) {
             const innerMatrix = generateInnerMatrix(symbols, miniSlotProb);
             const outerRingSymbol = getRandomSymbol(symbols, outerRingProb);
@@ -181,12 +200,7 @@ function runMiniSpin(bonus, betPerLines) {
             if (outerRingSymbol === 7) {
                 lives--;
             }
-            console.log(`Inner Matrix: ${innerMatrix.join(', ')}`);
-            console.log(`Outer Ring: ${outerRingSymbol}`);
-            console.log(`Matches: ${matchCount}, Win: ${win}`);
-            console.log(`Lives remaining: ${lives}`);
         }
-        console.log(`${JSON.stringify(result)}`);
         return result;
     }
     catch (error) {
