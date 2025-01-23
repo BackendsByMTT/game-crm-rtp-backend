@@ -64,7 +64,6 @@ export function handleBonusGameSpin(gameInstance: SLPB) {
         settings.thunderBonus.thunderSpinCount = 0;
         settings.thunderBonus.isThunderBonus = false;
         settings.thunderBonus.thunderSpinsAdded = false;
-        gameInstance.playerData.currentWining += payoutOfBonusGame;
     }
 
 }
@@ -174,7 +173,7 @@ export function calculatePayoutOfBonusGame(gameInstance: SLPB) {
 
     //handle grand prize
     if ((settings.isGrandPrize)) {
-        const payout = settings.grandMultiplier * settings.BetPerLines;
+        const payout = settings.grandMultiplier * settings.currentBet;
         totalPayout += payout;
     }
 
