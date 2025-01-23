@@ -12,14 +12,14 @@ export interface gambleResponse {
  *
  * */
 export function sendInitGambleData() {
-  console.log("gamble init");
+  // console.log("gamble init");
 }
 
 export function getGambleResult(response: {
   selected: "HEAD" | "TAIL",
 })
   : gambleResponse {
-  console.log("gamble result", response);
+  // console.log("gamble result", response);
   const result = getRandomFlip()
 
 

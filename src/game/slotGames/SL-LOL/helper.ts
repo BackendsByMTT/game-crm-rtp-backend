@@ -1,7 +1,7 @@
 import { SLLOL } from './LifeOfLuxury';
 import { SymbolType, GameResult, WinningCombination, FreeSpinResponse } from './types';
 import { WinData } from "../BaseSlotGame/WinData";
-import { convertSymbols, UiInitData } from '../../Utils/gameUtils';
+import { convertSymbols, UiInitData, shuffleArray} from '../../Utils/gameUtils';
 import { precisionRound } from '../../../utils/utils';
 
 
@@ -78,13 +78,6 @@ export function generateInitialReel(gameSettings: any): number[][] {
   }
 }
 
-function shuffleArray(array: any[]) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-}
-
 export function sendInitData(gameInstance: SLLOL) {
   UiInitData.paylines = convertSymbols(gameInstance.settings.Symbols);
   const credits = gameInstance.getPlayerData().credits
@@ -130,7 +123,7 @@ export function makeResultJson(gameInstance: SLLOL) {
       }
     };
 
-    console.log("Sending result JSON:", sendData);
+    // console.log("Sending result JSON:", sendData);
     gameInstance.sendMessage('ResultData', sendData);
   } catch (error) {
     console.error("Error generating result JSON or sending message:", error);
@@ -315,7 +308,7 @@ export function checkWin(gameInstance: SLLOL): { payout: number; winningCombinat
   }
 
   const bool = checkForFreespin(gameInstance)
-  console.log("isFreespin", bool);
+  // console.log("isFreespin", bool);
 
   //reset multiplers for freespin when its over 
   if (settings.freeSpinCount <= 0 && settings.isFreeSpin === false) {

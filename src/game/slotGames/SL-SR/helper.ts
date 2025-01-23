@@ -4,6 +4,7 @@ import {
   gameCategory,
   PlayerData,
   UiInitData,
+  shuffleArray
 } from "../../Utils/gameUtils";
 import { SLSR } from "./stinkinRichBase";
 import { specialIcons } from "./types";
@@ -92,18 +93,7 @@ export function generateInitialReel(gameSettings: any): string[][] {
   });
   return reels;
 }
-/**
- * Shuffles the elements of an array in place using the Fisher-Yates algorithm.
- * @param array - The array to be shuffled.
- */
-// Utility function to shuffle an array and return the shuffled array
-function shuffleArray<T>(array: T[]): T[] {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-  return array; // Make sure to return the shuffled array
-}
+
 
 export function makePayLines(gameInstance: SLSR) {
   const { settings } = gameInstance;
@@ -271,7 +261,14 @@ function runBonusGame(bonusSymbolCount: number, gameInstance: SLSR) {
     settings.selectedMultiplier = selectMultiplierFromArray(settings.multiplierArray, settings.multiplierProbabilities);
     console.log("Selected Multiplier: ", settings.selectedMultiplier);
 
-    settings.shuffledBonusValues = shuffleArray(selectedBonusValues);
+    settings.shuffledBonusValues = [...selectedBonusValues]; 
+    for (let i = settings.shuffledBonusValues.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [settings.shuffledBonusValues[i], settings.shuffledBonusValues[j]] = [
+        settings.shuffledBonusValues[j],
+        settings.shuffledBonusValues[i],
+      ];
+    }
     console.log("Shuffled Bonus Values: ", settings.shuffledBonusValues);
 
     const sumOfValues = settings.shuffledBonusValues.slice(0, -1).reduce((sum, value) => sum + value, 0);

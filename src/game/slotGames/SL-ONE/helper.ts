@@ -1,5 +1,5 @@
 import Payouts from "../../../dashboard/payouts/payoutModel";
-import { convertSymbols, UiInitData } from "../../Utils/gameUtils";
+import { convertSymbols, UiInitData,shuffleArray } from "../../Utils/gameUtils";
 import { WinData } from "../BaseSlotGame/WinData";
 import { RandomResultGenerator } from "../RandomResultGenerator";
 import { SLONE } from "./OneOfAKindBase";
@@ -103,13 +103,6 @@ export function generateInitialReel(gameSettings: any): string[] {
   shuffleArray(reel);
 
   return reel;
-}
-
-function shuffleArray(array: any[]) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
 }
 
 export function sendInitData(gameInstance: SLONE) {

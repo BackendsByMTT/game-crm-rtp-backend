@@ -2,5 +2,6 @@
   "todo-tree.tree.showBadges": true,
   "files.associations": {
     "plyconfig.json": "jsonc"
-  }
+  },
+  "workbench.panel.defaultLocation": "bottom"
 }

@@ -7,11 +7,35 @@ interface Symbol {
     payout: number;
     reelInstance: { [key: string]: number };
 }
+
+export interface FrozenIndex {
+    position: [number, number];
+    prizeValue?:number;
+    value: number;
+    symbol:number|string;
+  }
+
+ 
+export interface bonusSymbol {
+    id?:number;
+    position: [number, number];
+    prizeValue:number;
+    symbol:number|string;
+
+  } 
+
+//  export interface mysterySymbol {
+//     position: [number, number];
+//     prizeValue?:number;
+//     symbol: number;
+//  } 
 export interface SLSMSETTINGS {
     id: string;
     matrix: { x: number, y: number };
     currentGamedata: GameData;
     resultSymbolMatrix: any[];
+    tempResultSymbolMatrix:any[];
+    bonusResultMatrix:any[];
     lineData: any[],
     _winData: WinData | undefined;
     currentBet: number;
@@ -20,14 +44,41 @@ export interface SLSMSETTINGS {
     BetPerLines: number;
     bets: number[];
     reels: any[][];
+    bonusReels: any[][];
     Symbols: Symbol[];
+    BonusSymbols: Symbol[];
+    stickyBonusValue:FrozenIndex[],
+    stickySymbolCount: number [],
+    stickySymbolCountProb :number [],
+    prizeValue:number [],
+    prizeValueProb: number [], 
+    mysteryValues: number [],
+    mysteryValueProb :number [],
+    moonMysteryValues:number [],
+    moonMysteryValueProb: number [], 
+    bonusSymbolValue: bonusSymbol[],
+    frozenIndices:bonusSymbol[],
+    miniMultiplier:number,
+    minorMultiplier:number,
+    majorMultiplier:number,
+    grandMultiplier:number,
+    moonMultiplier:number,
+    minMatchCount:number,
+    freeSpinMatchCount:number,
+    moonMysteryData:bonusSymbol[],
+    isMoonJackpot:boolean,
+    isStickyBonusSymbol:boolean,
+    isGrandPrize:boolean,
+    isStickyBonus:boolean,
+    wildPayout:number,
+    isAllWild:boolean,
     freeSpin: {
-        symbolID: string,
         freeSpinCount: number,
+        freeSpinAwarded: number,
         useFreeSpin: boolean,
         freeSpinsAdded: boolean,
+        freeSpinPayout:number
     };
-    replacedToWildIndices:any[],
     wild: {
         SymbolName: string;
         SymbolID: number;

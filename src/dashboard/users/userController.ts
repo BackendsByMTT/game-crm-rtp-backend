@@ -9,7 +9,7 @@ import createHttpError from "http-errors";
 import jwt from "jsonwebtoken";
 import { config } from "../../config/config";
 import bcrypt from "bcrypt";
-import mongoose from "mongoose";
+import mongoose, { PipelineStage } from "mongoose";
 import { User, Player as PlayerModel, Player } from "./userModel";
 import UserService from "./userService";
 import Transaction from "../transactions/transactionModel";
@@ -160,6 +160,7 @@ export class UserController {
         sameSite: "none",
       });
 
+
       const socketUser = sessionManager.getPlayerPlatform(username);
 
       if (socketUser?.platformData.socket?.connected || socketUser?.gameData.socket) {
@@ -188,7 +189,7 @@ export class UserController {
 
       if (!username) {
         throw createHttpError(400, "Username is required");
-      }      
+      }
 
       // Clear the user token cookie
       res.clearCookie("userToken", {
@@ -340,8 +341,12 @@ export class UserController {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
       const skip = (page - 1) * limit;
+      const sortOrder = req.query.sort === "desc" ? -1 : 1; // Default to ascending order
       const filter = req.query.filter || "";
       const search = req.query.search as string;
+
+
+
       let parsedData: QueryParams = {
         role: "",
         status: "",
@@ -399,53 +404,73 @@ export class UserController {
         };
       }
 
+      // Aggregation pipeline for User collection
+      const userPipeline = [
+        { $match: query },
+        { $project: { _id: 1, name: 1, username: 1, status: 1, totalRedeemed: 1, totalRecharged: 1, credits: 1, createdAt: 1, role: 1 } }
+      ];
+
+
+
+      // Combined pipeline with $unionWith for PlayerModel collection
+      const combinedPipeline: PipelineStage[] = [
+        ...userPipeline,
+        {
+          $unionWith: {
+            coll: "players", // Replace with the actual MongoDB collection name for PlayerModel
+            pipeline: [
+              { $match: query },
+              { $project: { _id: 1, name: 1, username: 1, status: 1, totalRedeemed: 1, totalRecharged: 1, credits: 1, createdAt: 1, role: 1 } }
+            ]
+          }
+        },
+        { $sort: { createdAt: sortOrder } }, // Global sorting
+        { $skip: skip }, // Pagination: skip to the correct page
+        { $limit: limit } // Pagination: limit the number of results
+      ];
+
+      // Execute the aggregation pipeline
+      const subordinates = await User.aggregate(combinedPipeline);
+
+      // Calculate total counts
       const userCount = await User.countDocuments(query);
       const playerCount = await PlayerModel.countDocuments(query);
       const totalSubordinates = userCount + playerCount;
       const totalPages = Math.ceil(totalSubordinates / limit);
 
+
+      // Response for no data
       if (totalSubordinates === 0) {
         return res.status(200).json({
           message: "No subordinates found",
           totalSubordinates: 0,
           totalPages: 0,
           currentPage: 0,
-          subordinates: [],
+          subordinates: []
         });
       }
 
+      // Validate requested page number
       if (page > totalPages) {
         return res.status(400).json({
           message: `Page number ${page} is out of range. There are only ${totalPages} pages available.`,
           totalSubordinates,
           totalPages,
           currentPage: page,
-          subordinates: [],
+          subordinates: []
         });
       }
 
-      let users = [];
-      if (skip < userCount) {
-        users = await User.find(query).skip(skip).limit(limit);
-      }
-
-      const remainingLimit = limit - users.length;
-      let players = [];
-      if (remainingLimit > 0) {
-        const playerSkip = Math.max(0, skip - userCount);
-        players = await PlayerModel.find(query)
-          .skip(playerSkip)
-          .limit(remainingLimit);
-      }
-
-      const allSubordinates = [...users, ...players];
-
+      // Success response
       res.status(200).json({
         totalSubordinates,
         totalPages,
         currentPage: page,
-        subordinates: allSubordinates,
+        subordinates
       });
+
+
+
     } catch (error) {
       next(error);
     }
@@ -606,6 +631,8 @@ export class UserController {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
       const skip = (page - 1) * limit;
+      const sortOrder = req.query.sort === "desc" ? -1 : 1; // Default to ascending
+
 
       let userToCheck = currentUser;
 
@@ -677,53 +704,38 @@ export class UserController {
         };
       }
 
-      let subordinates;
-      let totalSubordinates;
+      // Aggregation pipeline
+      const userPipeline: PipelineStage[] = [
+        { $match: query },
+        { $project: { _id: 1, name: 1, username: 1, status: 1, totalRedeemed: 1, totalRecharged: 1, credits: 1, createdAt: 1, role: 1 } }
+      ];
 
-      if (userToCheck.role === "store") {
-        totalSubordinates = await PlayerModel.countDocuments(query);
-        subordinates = await PlayerModel.find(query)
-          .skip(skip)
-          .limit(limit)
-          .select(
-            "name username status role totalRecharged totalRedeemed credits"
-          );
-      } else if (userToCheck.role === "company") {
-        const userSubordinatesCount = await User.countDocuments(query);
-        const playerSubordinatesCount = await PlayerModel.countDocuments(query);
+      const combinedPipeline: PipelineStage[] = [
+        ...userPipeline,
+        {
+          $unionWith: {
+            coll: "players", // Replace with the actual collection name for PlayerModel
+            pipeline: [
+              { $match: query },
+              { $project: { _id: 1, name: 1, username: 1, status: 1, totalRedeemed: 1, totalRecharged: 1, credits: 1, createdAt: 1, role: 1 } }
+            ]
+          }
+        },
+        { $sort: { "createdAt": sortOrder } }, // Global sorting
+        { $skip: skip }, // Pagination
+        { $limit: limit } // Pagination
+      ];
 
-        totalSubordinates = userSubordinatesCount + playerSubordinatesCount;
-        const userSubordinates = await User.find(query)
-          .skip(skip)
-          .limit(limit)
-          .select(
-            "name username status role totalRecharged totalRedeemed credits"
-          );
+      // Execute the aggregation
+      const subordinates = await User.aggregate(combinedPipeline);
 
-        const remainingLimit = limit - userSubordinates.length;
-
-        const playerSubordinates =
-          remainingLimit > 0
-            ? await PlayerModel.find(query)
-              .skip(Math.max(skip - userSubordinatesCount, 0))
-              .limit(remainingLimit)
-              .select(
-                "name username status role totalRecharged totalRedeemed credits"
-              )
-            : [];
-
-        subordinates = [...userSubordinates, ...playerSubordinates];
-      } else {
-        totalSubordinates = await User.countDocuments(query);
-        subordinates = await User.find(query)
-          .skip(skip)
-          .select(
-            "name username status role totalRecharged totalRedeemed credits"
-          );
-      }
-
+      // Total counts
+      const userCount = await User.countDocuments(query);
+      const playerCount = await PlayerModel.countDocuments(query);
+      const totalSubordinates = userCount + playerCount;
       const totalPages = Math.ceil(totalSubordinates / limit);
 
+      // Handle no results
       if (totalSubordinates === 0) {
         return res.status(200).json({
           message: "No subordinates found",
@@ -734,6 +746,7 @@ export class UserController {
         });
       }
 
+      // Handle out-of-range page
       if (page > totalPages) {
         return res.status(400).json({
           message: `Page number ${page} is out of range. There are only ${totalPages} pages available.`,
@@ -744,6 +757,8 @@ export class UserController {
         });
       }
 
+
+      // Return response
       res.status(200).json({
         totalSubordinates,
         totalPages,

@@ -29,6 +29,7 @@ export interface SLPMSETTINGS {
     firstReel: any[],
     tempReelSym: any[],
     freeSpinData: any[][],
+    jackpotWinSymbols: any[],
     jackpot: {
         symbolName: string;
         symbolsCount: number;
@@ -36,6 +37,7 @@ export interface SLPMSETTINGS {
         defaultAmount: number;
         increaseValue: number;
         useJackpot: boolean;
+        jackpotCount: number;
     },
     freeSpin: {
         symbolID: string,

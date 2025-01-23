@@ -264,7 +264,10 @@ class PayoutsController {
       for (const [username, playerSocket] of sessionManager.getPlatformSessions()) {
         const gameId = tagName;
         if (playerSocket.currentGameData.gameId === gameId) {
-          playerSocket.currentGameData.currentGameManager.currentGameType.currentGame.initialize(matchingPayout.content.data)
+          playerSocket.currentGameData.gameSettings
+          
+          
+          // initialize(matchingPayout.content.data)
         }
       }
 

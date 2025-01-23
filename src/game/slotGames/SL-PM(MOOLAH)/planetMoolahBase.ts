@@ -1,7 +1,7 @@
 import { sessionManager } from "../../../dashboard/session/sessionManager";
 import { currentGamedata } from "../../../Player";
 import { RandomResultGenerator } from "../RandomResultGenerator";
-import { initializeGameSettings, generateInitialReel, sendInitData, makePayLines, checkForWin } from "./helper";
+import { initializeGameSettings, generateInitialReel, sendInitData, makePayLines, checkForWin, checkForJackpot } from "./helper";
 import { SLPMSETTINGS } from "./types";
 
 export class SLPM {
@@ -85,24 +85,19 @@ export class SLPM {
                 await this.deductPlayerBalance(this.settings.currentBet);
                 this.playerData.totalbet += this.settings.currentBet;
             }
-
-
             if (this.settings.freeSpin.freeSpinStarted) {
                 this.settings.freeSpin.freeSpinCount--;
                 console.log("Free Spin remaining count ", this.settings.freeSpin.freeSpinCount);
             }
-
             const spinId = platformSession.currentGameSession.createSpin();
             platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
-
-
             await new RandomResultGenerator(this);
+            checkForJackpot(this)
             checkForWin(this)
             if (this.settings.freeSpin.freeSpinCount == 0) {
                 this.settings.freeSpin.freeSpinStarted = false
                 this.settings.freeSpin.freeSpinCount = 0
             }
-
             const winAmount = this.playerData.currentWining;
             platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', winAmount);
 

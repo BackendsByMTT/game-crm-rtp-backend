@@ -1,3 +1,4 @@
+import { generateRandomNumber, generatetrueRandomNumber } from "../Utils/gameUtils";
 
 export class RandomResultGenerator {
   constructor(current) {
@@ -14,16 +15,21 @@ export class RandomResultGenerator {
     // matrix.pop();
     // matrix.pop();
     // matrix.pop();
-    // matrix.push(['10', '6', '10', '0', '4','6'])
-    // matrix.push(['1', '11', '14', '10', '1','6'])
-    // matrix.push(['5', '8', '1', '5', '1','6'])
+    // matrix.push(['8', '8', '8', '8', '8'])
+    // matrix.push(['5', '3', '2', '1', '1'])
+    // matrix.push(['5', '3', '1', '5', '1'])
     matrix.forEach(row => console.log(row.join(' ')));
     current.settings.resultReelIndex = matrix;
     current.settings.resultSymbolMatrix = matrix;
 
   }
   getRandomIndex(maxValue: number): number {
-    return Math.floor(Math.random() * (maxValue + 1));
+    let seed = Date.now() + Math.random() * 1000;
+
+
+    // return Math.floor(generateRandomNumber(seed, (maxValue + 1)));
+    return Math.floor(generatetrueRandomNumber(maxValue + 1));
+
   }
 
 }

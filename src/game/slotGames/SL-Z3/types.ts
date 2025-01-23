@@ -24,7 +24,6 @@ export interface ZEUSSETTINGS {
     reels: any[][];
     Symbols: Symbol[];
     freeSpin: {
-        symbolID: string,
         freeSpinCount: number,
         useFreeSpin: boolean,
         freeSpinsAdded: boolean,
@@ -35,9 +34,9 @@ export interface ZEUSSETTINGS {
         SymbolID: number;
         useWild: boolean
     },
-    scatter:{
-        symbolID:number;
-        useScatter:boolean;
+    freeSpinSymbol:{
+        symbolID: string,
+        multiplier:any[];
     }
 }
 
@@ -45,5 +44,4 @@ export interface ZEUSSETTINGS {
 export enum specialIcons {
     wild = "Wild",
     FreeSpin = "FreeSpin",
-    scatter =  "Scatter"
 }

@@ -1,3 +1,4 @@
+import { generatetrueRandomNumber } from "../../Utils/gameUtils";
 import { SLBB } from "./breakingBadBase";
 import { getCoinsValues, getRandomValue, handleCoinsAndCashCollect } from "./helper";
 
@@ -6,8 +7,8 @@ export class RandomBonusGenerator {
     let matrix: string[][] = [];
     let ccIndices = current.settings.cashCollect.values.map(cc => `${cc.index[0]},${cc.index[1]}`);
     let coinIndices = current.settings.coins.bonusValues.map(cc => `${cc.index[0]},${cc.index[1]}`);
-    console.log("ccIndices", ccIndices);
-    console.log("coinIndices", coinIndices);
+    // console.log("ccIndices", ccIndices);
+    // console.log("coinIndices", coinIndices);
 
     for (let x = 0; x < current.settings.currentGamedata.matrix.x; x++) {
       const startPosition = this.getRandomIndex((current.settings.bonusReels[x].length - 1));
@@ -31,15 +32,20 @@ export class RandomBonusGenerator {
     // matrix.push(['10', '6', '10', '0', '4','6'])
     // matrix.push(['1', '11', '14', '10', '1','6'])
     // matrix.push(['5', '8', '1', '5', '1','6'])
-    console.log("bonus matrix");
+    // console.log("bonus matrix");
 
-    matrix.forEach(row => console.log(row.join(' ')));
+    // matrix.forEach(row => console.log(row.join(' ')));
     // current.settings.resultReelIndex = matrix;
     current.settings.bonusResultMatrix = matrix;
 
   }
   getRandomIndex(maxValue: number): number {
-    return Math.floor(Math.random() * (maxValue + 1));
+    let seed = Date.now() + Math.random() * 1000 ; 
+
+    
+    // return Math.floor(generateRandomNumber(seed, (maxValue + 1)));
+    return Math.floor(generatetrueRandomNumber (maxValue + 1));
+
   }
 
 }
@@ -51,6 +57,9 @@ export function checkForBonus(gameInstance: SLBB, hasCC: boolean, hasL: boolean,
     settings.bonus.isTriggered = true
     settings.bonus.isBonus = true
     settings.bonus.count = 3
+
+    //NOTE: add rtpcount 
+    //
     //TODO: also init bonus 
     // 1. set coins and cc to []
     // 2. freeze cc and swapped coins at link
@@ -134,7 +143,7 @@ export function handleBonusSpin(gameInstance: SLBB) {
 
   if (isWalterStash) {
     settings.bonus.isWalterStash = true
-    settings.bonus.payout += settings.jackpot.payout[settings.jackpot.payout.length - 1] * settings.BetPerLines
+    settings.bonus.payout += settings.jackpot.payout[0] * settings.BetPerLines
     settings.bonus.count = 0
   }
   if (settings.bonus.count == 0) {

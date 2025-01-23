@@ -1,5 +1,5 @@
 import { WinData } from "../BaseSlotGame/WinData";
-import { convertSymbols, UiInitData } from "../../Utils/gameUtils";
+import { convertSymbols, UiInitData ,shuffleArray} from "../../Utils/gameUtils";
 import { SLWOF } from "./wheelOfFortuneBase";
 import { WINNINGTYPE } from "./types";
 import { CloudWatchLogs } from "aws-sdk";
@@ -49,14 +49,6 @@ export function generateInitialReel(gameSettings: any): string[][] {
     });
     return reels;
 }
-
-function shuffleArray(array: any[]) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-}
-
 
 export function triggerBonusGame(gameInstance: SLWOF): number {
     const { settings } = gameInstance

@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose, { SortOrder } from "mongoose";
 import { ITransaction } from "./transactionType";
 import { rolesHierarchy } from "../../utils/utils";
 import createHttpError from "http-errors";
@@ -73,7 +73,9 @@ export class TransactionService {
     username: string,
     page: number,
     limit: number,
-    query: QueryParams
+    query: QueryParams,
+    sortField: keyof ITransaction,
+    sortOrder: number
   ) {
     const skip = (page - 1) * limit;
 
@@ -119,9 +121,9 @@ export class TransactionService {
         query,
       ],
     })
+      .sort({ [sortField]: sortOrder } as Record<string, SortOrder>) // Explicit cast to Record<string, SortOrder>
       .skip(skip)
       .limit(limit);
-
 
 
     return {

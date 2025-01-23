@@ -1,6 +1,6 @@
 import { SymbolType, GameResult, WinningCombination, SpecialSymbols } from './types';
 import { WinData } from "../BaseSlotGame/WinData";
-import { convertSymbols, UiInitData } from '../../Utils/gameUtils';
+import { convertSymbols, UiInitData, shuffleArray } from '../../Utils/gameUtils';
 import { precisionRound } from '../../../utils/utils';
 import { SLTM } from './TimeMachineBase';
 
@@ -36,6 +36,8 @@ export function initializeGameSettings(gameData: any, gameInstance: SLTM) {
       SymbolId: gameInstance.currentGameData.gameSettings.Symbols.find((sym: SymbolType) => sym.Name == SpecialSymbols.WILD).Id
       ,
       SymbolName: SpecialSymbols.WILD,
+      cutoffLevel: gameSettings.wildCutoffLevel,
+      subs: gameSettings.wildSubs
     },
     freeSpin: {
       SymbolId: gameInstance.currentGameData.gameSettings.Symbols.find((sym: SymbolType) => sym.Name == SpecialSymbols.FREE_SPIN).Id
@@ -43,7 +45,6 @@ export function initializeGameSettings(gameData: any, gameInstance: SLTM) {
       SymbolName: SpecialSymbols.FREE_SPIN,
     }
   };
-
   // Add WinData separately to avoid circular reference in logging
   settings._winData = new WinData(gameInstance);
 
@@ -88,13 +89,6 @@ export function generateInitialReel(gameSettings: any): number[][] {
 }
 
 
-function shuffleArray(array: any[]) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-}
-
 export function sendInitData(gameInstance: SLTM) {
   UiInitData.paylines = convertSymbols(gameInstance.settings.Symbols);
   const credits = gameInstance.getPlayerData().credits
@@ -105,6 +99,7 @@ export function sendInitData(gameInstance: SLTM) {
     GameData: {
       Reel: reels,
       Bets: gameInstance.settings.currentGamedata.bets,
+      FreespinBonusCount: gameInstance.settings.freeSpinIncrement,
     },
     UIData: UiInitData,
     PlayerData: {
@@ -147,48 +142,70 @@ export function checkWin(gameInstance: SLTM): { payout: number; winningCombinati
 
     settings.isLevelUp = false
 
+    //NOTE: wild sub 
+    //1 check if level above cutoff
+    //2 check if there are wild symbols
+    //3 substitute wild symbols
+    // console.log(settings.level, settings.wild.cutoffLevel);
+    
+
+    if (settings.level >= settings.wild.cutoffLevel) {
+      let newMatrix = JSON.parse(JSON.stringify(settings.resultSymbolMatrix))
+      settings.resultSymbolMatrix.forEach((row, y) => {
+        row.forEach((symbolId, x) => {
+          if (isWild(symbolId, settings.wild.SymbolId)) {
+            newMatrix[y][x] = getRandomIndex(settings.wild.subs)
+          }
+        })
+      })
+      settings.resultSymbolMatrix = newMatrix
+    }
+
+
+
+
     //NOTE: freespin plus one substitute
     if (settings.isFreeSpin) {
-      console.log("Free spin mode active.");
+      // console.log("Free spin mode active.");
 
       const freeSpinIndex = getRandomIndex(settings.freeSpinRetriggerProbs);
-      console.log("Generated freeSpinIndex:", freeSpinIndex, "from probabilities:", settings.freeSpinRetriggerProbs);
+      // console.log("Generated freeSpinIndex:", freeSpinIndex, "from probabilities:", settings.freeSpinRetriggerProbs);
 
       let y: number = 0;
       if (freeSpinIndex !== 0) {
         y = getRandomIndex([1, 1, 1, 1, 1, 1, 1]);
-        console.log("Generated y index:", y);
+        // console.log("Generated y index:", y);
       }
 
       switch (freeSpinIndex) {
         case 0:
-          console.log("No extra free spin triggered.");
+          // console.log("No extra free spin triggered.");
           break;
 
         case 1:
-          console.log("Extra free spin in 1st reel/column at position y:", y);
+          // console.log("Extra free spin in 1st reel/column at position y:", y);
           settings.resultSymbolMatrix[y][0] = settings.freeSpin.SymbolId;
           settings.isFreeSpinTriggered = true;
           settings.freeSpinCount += 1;
           break;
 
         case 2:
-          console.log("Extra free spin in 2nd reel/column at position y:", y);
+          // console.log("Extra free spin in 2nd reel/column at position y:", y);
           settings.resultSymbolMatrix[y][1] = settings.freeSpin.SymbolId;
           break;
 
         case 3:
-          console.log("Extra free spin in 3rd reel/column at position y:", y);
+          // console.log("Extra free spin in 3rd reel/column at position y:", y);
           settings.resultSymbolMatrix[y][2] = settings.freeSpin.SymbolId;
           break;
 
         case 4:
-          console.log("Extra free spin in 4th reel/column at position y:", y);
+          // console.log("Extra free spin in 4th reel/column at position y:", y);
           settings.resultSymbolMatrix[y][3] = settings.freeSpin.SymbolId;
           break;
 
         case 5:
-          console.log("Extra free spin in 5th reel/column at position y:", y);
+          // console.log("Extra free spin in 5th reel/column at position y:", y);
           settings.resultSymbolMatrix[y][4] = settings.freeSpin.SymbolId;
           settings.isFreeSpinTriggered = true;
           settings.freeSpinCount += 1;
@@ -199,8 +216,8 @@ export function checkWin(gameInstance: SLTM): { payout: number; winningCombinati
           break;
       }
 
-      console.log("Updated resultSymbolMatrix:", settings.resultSymbolMatrix);
-      console.log("Free spin count:", settings.freeSpinCount, "Free spin triggered:", settings.isFreeSpinTriggered);
+      // console.log("Updated resultSymbolMatrix:", settings.resultSymbolMatrix);
+      // console.log("Free spin count:", settings.freeSpinCount, "Free spin triggered:", settings.isFreeSpinTriggered);
     }
 
 
@@ -340,8 +357,8 @@ export function makeResultJson(gameInstance: SLTM) {
       }
     };
 
-    console.log("Sending result JSON:");
-    console.log(JSON.stringify(sendData));
+    // console.log("Sending result JSON:");
+    // console.log(JSON.stringify(sendData));
 
 
     gameInstance.sendMessage('ResultData', sendData);

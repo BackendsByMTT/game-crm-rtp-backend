@@ -1,5 +1,5 @@
 import { currentGamedata } from "../../../Player";
-import { generateInitialReel, initializeGameSettings, sendInitData, makeResultJson, printWinningCombinations, checkWin, checkForFreespin } from "./helper";
+import { generateInitialReel, initializeGameSettings, sendInitData, checkWin } from "./helper";
 import { SLLOLSETTINGS } from "./types";
 import { RandomResultGenerator } from "../RandomResultGenerator";
 import { getGambleResult, sendInitGambleData } from "./gamble";

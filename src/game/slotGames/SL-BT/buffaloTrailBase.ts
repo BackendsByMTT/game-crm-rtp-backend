@@ -69,43 +69,29 @@ export class SLBT {
         this.settings.currentBet = this.settings.BetPerLines
     }
 
-
     public async spinResult(): Promise<void> {
         try {
-            const playerData = this.getPlayerData();
-            const platformSession = sessionManager.getPlayerPlatform(playerData.username);
-
-            if (this.settings.currentBet > playerData.credits) {
-                console.log(this.settings.currentBet + playerData.credits, 'dfdsfds')
-                this.sendError("Low Balance");
-                return;
-            }
-            console.log("free Spin count", this.settings.freeSpin.freeSpinCount);
-
-            if (this.settings.freeSpin.freeSpinCount == 0) {
+            const { username, credits } = this.getPlayerData();
+            const platformSession = sessionManager.getPlayerPlatform(username);
+            if (this.settings.currentBet > credits) return this.sendError("Low Balance");
+            const isFreeSpin = this.settings.freeSpin.freeSpinCount > 0;
+            if (isFreeSpin) {
+                this.settings.freeSpin.freeSpinCount--;
+                this.settings.freeSpin.useFreeSpin = false
+            } else {
+                console.log(`BALANCE: ${credits}`);
                 await this.deductPlayerBalance(this.settings.currentBet);
                 this.playerData.totalbet += this.settings.currentBet;
             }
-            if (this.settings.freeSpin.freeSpinCount > 0) {
-                this.settings.freeSpin.freeSpinCount--;
-            }
-
             const spinId = platformSession.currentGameSession.createSpin();
             platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
-
-
             await new RandomResultGenerator(this);
-            checkForWin(this)
-            if (this.settings.freeSpin.freeSpinCount == 0) {
-                this.settings.freeSpin.useFreeSpin = false
-            }
-
-            const winAmount = this.playerData.currentWining;
-            platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', winAmount);
-
+            checkForWin(this);
+            this.settings.freeSpin.useFreeSpin = this.settings.freeSpin.freeSpinCount > 0;
+            platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', this.playerData.currentWining);
         } catch (error) {
-            this.sendError("Spin error");
             console.error("Failed to generate spin results:", error);
+            this.sendError("Spin error");
         }
     }
 

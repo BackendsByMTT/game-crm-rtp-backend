@@ -45,7 +45,10 @@ export interface SLTMSETTINGS {
   winningCombinations: WinningCombination[]
   wild: {
     SymbolId: string;
-    SymbolName: string
+    SymbolName: string;
+    cutoffLevel: number;
+    subs: number[];
+
   },
   freeSpin: {
     SymbolId: string;

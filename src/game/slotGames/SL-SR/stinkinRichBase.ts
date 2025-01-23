@@ -82,9 +82,11 @@ export class SLSR {
                 await this.deductPlayerBalance(this.settings.currentBet);
                 this.playerData.totalbet += this.settings.currentBet;
             }
-
-            if (this.settings.freeSpin.freeSpinCount > 0) {
-                this.settings.freeSpin.freeSpinCount--;
+        
+            if(this.settings.freeSpin.freeSpinCount>0)
+            {   
+                
+                this.settings.freeSpin.freeSpinCount --;
             }
 
             const spinId = platformSession.currentGameSession.createSpin();

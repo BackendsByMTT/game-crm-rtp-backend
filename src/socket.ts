@@ -113,10 +113,32 @@ const handlePlayerConnection = async (socket: Socket, decoded: DecodedToken, use
     }
 
     // Game connection without existing platform connection
-    if (gameId) {
-        socket.emit(messageType.ERROR, "You need to have an active platform connection before joining a game.");
-        socket.disconnect(true);
+    if (process.env.NODE_ENV === "testing") {
+        console.log("Testing environment detected. Creating platform socket for the player.");
+
+        const mockPlatformSocket = {
+            handshake: { auth: { platformId: `test-platform-${username}` } },
+            connected: true,
+            emit: socket.emit.bind(socket),
+            disconnect: socket.disconnect.bind(socket),
+            on: socket.on.bind(socket),
+        } as unknown as Socket;
+
+        const testPlayer = new Player(
+            username,
+            decoded.role,
+            status,
+            credits,
+            userAgent,
+            mockPlatformSocket,
+            managerName
+        );
+
+        testPlayer.platformData.platformId = `test-platform-${username}`;
+        await testPlayer.updateGameSocket(socket);
         return;
+
+
     }
 
     // Invalid connection attempt

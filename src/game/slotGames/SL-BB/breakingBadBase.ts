@@ -3,6 +3,7 @@ import { SLBBSETTINGS } from "./types";
 import { initializeGameSettings, generateInitialReel, checkForWin, sendInitData, generateInitialBonusReel, makePayLines, } from "./helper";
 import { RandomResultGenerator } from "../RandomResultGenerator";
 import { sessionManager } from "../../../dashboard/session/sessionManager";
+import { precisionRound } from "../../../utils/utils";
 
 export class SLBB {
   public settings: SLBBSETTINGS;
@@ -64,14 +65,12 @@ export class SLBB {
       default:
         this.sendMessage(response.id, "invalid request");
     }
-
   }
   private prepareSpin(data: any) {
     this.settings.currentLines = data.currentLines;
     this.settings.BetPerLines = this.settings.currentGamedata.bets[data.currentBet];
-    this.settings.currentBet = this.settings.BetPerLines * this.settings.currentLines;
+    this.settings.currentBet = this.settings.BetPerLines * this.settings.currentLines
   }
-
 
   public async spinResult(): Promise<void> {
     try {
@@ -86,37 +85,17 @@ export class SLBB {
       }
 
       if (!(this.settings.bonus.count > 0) && !(this.settings.freeSpin.count > 0)) {
+
         this.decrementPlayerBalance(this.settings.currentBet);
-        this.playerData.totalbet += this.settings.currentBet;
+        this.playerData.totalbet = precisionRound((this.settings.currentBet + this.playerData.totalbet), 4)
       }
-      // if (!bonus.isTriggered) {
-      //   this.decrementPlayerBalance(this.settings.currentBet);
-      // }
-      // if (heisenberg.freeSpin.freeSpinCount === 1) {
-      //   heisenberg.isTriggered= false;
-      // }
-      // if (freeSpin.count === 1) {
-      //   freeSpin.isFreeSpin = false;
-      // }
       if (
-        // freeSpin.isFreeSpin &&
         freeSpin.count > 0 &&
         !this.settings.bonus.isBonus
       ) {
         freeSpin.count--;
 
-        this.settings.currentBet = 0;
-        console.log(
-          freeSpin.count,
-          "this.settings.freeSpinCount"
-        );
       }
-      // !( this.settings.bonus.count>0 ) || !( this.settings.freeSpin.count>0 )
-      // this.incrementPlayerBalance(this.playerData.currentWining)
-      // console.log("bonus", this.settings.bonus.count);
-      // console.log("free", this.settings.freeSpin.count);
-      // console.log("bool", !( this.settings.bonus.count>0 ) || !( this.settings.freeSpin.count>0 ));
-      //
 
       const spinId = platformSession.currentGameSession.createSpin();
       platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
@@ -152,7 +131,7 @@ export class SLBB {
       if (spend > 0) {
         rtp = won / spend;
       }
-      // console.log('RTP calculated:', rtp * 100);
+      console.log('RTP calculated:', rtp * 100);
       return;
     } catch (error) {
       console.error("Failed to calculate RTP:", error);

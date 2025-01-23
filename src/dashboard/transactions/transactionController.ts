@@ -58,6 +58,11 @@ export class TransactionController {
       const limit = parseInt(req.query.limit as string) || 10;
       const search = req.query.search as string;
       const filter = req.query.filter || "";
+      const sortOrder = req.query.sort === "desc" ? -1 : 1; // Default to ascending order
+
+      console.log("getTransactions : ")
+      console.log(username + " : " + req.query.sort)
+
       let parsedData: QueryParams = {
         role: "",
         status: "",
@@ -68,6 +73,7 @@ export class TransactionController {
         type: "",
         amount: { From: 0, To: Infinity },
       };
+
       let type, updatedAt, amount;
 
       if (search) {
@@ -119,7 +125,9 @@ export class TransactionController {
         username,
         page,
         limit,
-        query
+        query,
+        "createdAt",
+        sortOrder
       );
 
       if (outOfRange) {
@@ -159,6 +167,11 @@ export class TransactionController {
 
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
+      const sortOrder = req.query.sort === "desc" ? -1 : 1; // Default to ascending order
+
+      console.log("getTransactionsBySubId : ")
+      console.log(username + " : " + req.query.sort)
+
 
       const user = await User.findOne({ username });
       const subordinate =
@@ -187,7 +200,9 @@ export class TransactionController {
           subordinate.username,
           page,
           limit,
-          query
+          query,
+          "createdAt",
+          sortOrder
         );
 
         if (outOfRange) {
@@ -225,6 +240,7 @@ export class TransactionController {
       const _req = req as AuthRequest;
       const { username, role } = _req.user;
 
+
       if (role != "company") {
         throw createHttpError(
           403,
@@ -236,6 +252,12 @@ export class TransactionController {
       const limit = parseInt(req.query.limit as string) || 10;
       const search = req.query.search as string;
       const filter = req.query.filter || "";
+      const sortOrder = req.query.sort === "desc" ? -1 : 1; // Default to ascending order
+      const skip = (page - 1) * limit;
+
+      console.log("GET ALL TRANSACTIONS : ")
+      console.log(username + " : " + req.query.sort)
+
       let parsedData: QueryParams = {
         role: "",
         status: "",
@@ -289,10 +311,9 @@ export class TransactionController {
         };
       }
 
-      const skip = (page - 1) * limit;
-
       const totalTransactions = await Transaction.countDocuments(query);
       const totalPages = Math.ceil(totalTransactions / limit);
+
 
       // Check if the requested page is out of range
       if (page > totalPages && totalPages !== 0) {
@@ -306,6 +327,7 @@ export class TransactionController {
       }
 
       const transactions = await Transaction.find(query)
+        .sort({ "createdAt": sortOrder }) // Sort by the specified field and order
         .skip(skip)
         .limit(limit);
 
@@ -315,6 +337,34 @@ export class TransactionController {
         currentPage: page,
         transactions,
       });
+
+
+      // const skip = (page - 1) * limit;
+
+      // const totalTransactions = await Transaction.countDocuments(query);
+      // const totalPages = Math.ceil(totalTransactions / limit);
+
+      // // Check if the requested page is out of range
+      // if (page > totalPages && totalPages !== 0) {
+      //   return res.status(400).json({
+      //     message: `Page number ${page} is out of range. There are only ${totalPages} pages available.`,
+      //     totalTransactions,
+      //     totalPages,
+      //     currentPage: page,
+      //     transactions: [],
+      //   });
+      // }
+
+      // const transactions = await Transaction.find(query)
+      //   .skip(skip)
+      //   .limit(limit);
+
+      // res.status(200).json({
+      //   totalTransactions,
+      //   totalPages,
+      //   currentPage: page,
+      //   transactions,
+      // });
     } catch (error) {
       console.error(
         `Error fetching transactions by client ID: ${error.message}`

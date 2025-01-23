@@ -2,6 +2,7 @@ import { WinData } from "../BaseSlotGame/WinData";
 import {
   convertSymbols,
   UiInitData,
+  shuffleArray
 } from "../../Utils/gameUtils";
 import { SLPSF } from "./president45Base";
 import { specialIcons } from "./types";
@@ -26,7 +27,7 @@ export function initializeGameSettings(gameData: any, gameInstance: SLPSF) {
     currentLines: 0,
     BetPerLines: 0,
     reels: [],
-
+    isWining: false,
     freeSpin: {
       SymbolName: "",
       SymbolID: "-1",
@@ -36,6 +37,8 @@ export function initializeGameSettings(gameData: any, gameInstance: SLPSF) {
       freeSpinCount: 0,
       noOfFreeSpins: 0,
       useFreeSpin: false,
+      jokerSymbols: [],
+      trumpSymbols: []
     },
     wild: {
       SymbolName: "",
@@ -70,16 +73,6 @@ export function generateInitialReel(gameSettings: any): string[][] {
   return reels;
 }
 
-/**
- * Shuffles the elements of an array in place using the Fisher-Yates algorithm.
- * @param array - The array to be shuffled.
- */
-function shuffleArray(array: any[]) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-}
 
 export function makePayLines(gameInstance: SLPSF) {
   const { settings } = gameInstance;
@@ -97,18 +90,14 @@ function handleSpecialSymbols(symbol: any, gameInstance: SLPSF) {
       gameInstance.settings.wild.useWild = true;
       break;
     case specialIcons.trumpFreeSpin:
-
       gameInstance.settings.trumpFreeSpin.SymbolName = symbol.Name;
       gameInstance.settings.trumpFreeSpin.SymbolID = symbol.Id;
       break;
     case specialIcons.freeSpin:
-
       gameInstance.settings.freeSpin.SymbolName = symbol.Name;
       gameInstance.settings.freeSpin.SymbolID = symbol.Id;
       gameInstance.settings.freeSpin.freeSpinMuiltiplier = symbol.multiplier
-
       gameInstance.settings.freeSpin.useFreeSpin = true;
-
       break;
     default:
       break;
@@ -118,7 +107,7 @@ function handleSpecialSymbols(symbol: any, gameInstance: SLPSF) {
 //CHECK WINS ON PAYLINES WITH OR WITHOUT WILD
 export function checkForWin(gameInstance: SLPSF) {
   try {
-    const { settings } = gameInstance;
+    const { settings, playerData } = gameInstance;
     const winningLines = [];
     let totalPayout = 0;
     settings.lineData.forEach((line, index) => {
@@ -150,7 +139,7 @@ export function checkForWin(gameInstance: SLPSF) {
           );
           switch (true) {
             case symbolMultiplier > 0:
-              checkForTrumpFreeSpin(gameInstance)
+              settings.isWining = true
               totalPayout += symbolMultiplier;
               settings._winData.winningLines.push(index + 1);
               winningLines.push({
@@ -172,7 +161,8 @@ export function checkForWin(gameInstance: SLPSF) {
               if (validIndices.length > 0) {
                 settings._winData.winningSymbols.push(validIndices);
                 settings._winData.totalWinningAmount = totalPayout * settings.BetPerLines;
-
+                playerData.currentWining = settings._winData.totalWinningAmount
+                
               }
               break;
             default:
@@ -257,6 +247,7 @@ function accessData(symbol, matchCount, gameInstance: SLPSF) {
     const symbolData = settings.currentGamedata.Symbols.find(
       (s) => s.Id.toString() === symbol.toString()
     );
+
     if (symbolData) {
       const multiplierArray = symbolData.multiplier;
       if (multiplierArray && multiplierArray[5 - matchCount]) {
@@ -312,17 +303,29 @@ export function checkForFreeSpin(gameInstance: SLPSF): void {
   try {
     // Find positions of Free Spin symbols in the result matrix
     const freeSpinsSymbol = findSymbol(gameInstance, specialIcons.freeSpin);
-    if (freeSpinsSymbol.length > (5 - settings.freeSpin.freeSpinMuiltiplier.length)) {
-      console.log("!!! FREE SPIN AWARDED !!!");
+    if (freeSpinsSymbol.length > (5 - settings.freeSpin.freeSpinMuiltiplier.length) && freeSpinsSymbol.length <= 5) {
+      // console.log("!!! FREE SPIN AWARDED !!!");
       const freeSpins = accessData(settings.freeSpin.SymbolID, freeSpinsSymbol.length, gameInstance);
+      // console.log(freeSpins, 'freeSpins')
       settings.freeSpin.freeSpinStarted = true;
       settings.freeSpin.freeSpinsAdded = true;
       settings.freeSpin.freeSpinCount += freeSpins;
       playerData.totalSpin += freeSpins;
       // uncomment only for testing purpose 
       // playerData.rtpSpinCount += freeSpins;
-      settings._winData.winningSymbols.push(freeSpinsSymbol);
-      return
+      settings.freeSpin.jokerSymbols.push(freeSpinsSymbol);
+
+    } else if (freeSpinsSymbol.length > 5) {
+      // console.log("!!! FREE SPIN AWARDED !!!");
+      const freeSpins = accessData(settings.freeSpin.SymbolID, 5, gameInstance);
+      // console.log(freeSpins, 'freeSpins')
+      settings.freeSpin.freeSpinStarted = true;
+      settings.freeSpin.freeSpinsAdded = true;
+      settings.freeSpin.freeSpinCount += freeSpins;
+      playerData.totalSpin += freeSpins;
+      // uncomment only for testing purpose 
+      // playerData.rtpSpinCount += freeSpins;
+      settings.freeSpin.jokerSymbols.push(freeSpinsSymbol);
     }
   } catch (error) {
     console.error("Error in checkForFreeSpin:", error);
@@ -335,12 +338,12 @@ export function checkForTrumpFreeSpin(gameInstance: SLPSF): void {
   try {
     // Find positions of TrumpFreeSpin symbols in the result matrix
     const TrumpFreeSpinSymbol = findSymbol(gameInstance, specialIcons.trumpFreeSpin);
-    if (15 - TrumpFreeSpinSymbol.length > 0) {
+    if (TrumpFreeSpinSymbol.length > 0 && settings.isWining) {
       console.log(TrumpFreeSpinSymbol.length, 'checkForTrumpFreeSpin')
       settings.freeSpin.freeSpinStarted = true;
       settings.freeSpin.freeSpinsAdded = true;
       settings.freeSpin.freeSpinCount += TrumpFreeSpinSymbol.length;
-      settings._winData.winningSymbols.push(TrumpFreeSpinSymbol);
+      settings.freeSpin.trumpSymbols.push(TrumpFreeSpinSymbol);
       return
     }
   } catch (error) {
@@ -366,9 +369,6 @@ export function sendInitData(gameInstance: SLPSF) {
     UIData: UiInitData,
     PlayerData: {
       Balance: gameInstance.getPlayerData().credits,
-      haveWon: gameInstance.playerData.haveWon,
-      currentWining: gameInstance.playerData.currentWining,
-      totalbet: gameInstance.playerData.totalbet,
     },
   };
   gameInstance.sendMessage("InitData", dataToSend);
@@ -377,21 +377,25 @@ export function sendInitData(gameInstance: SLPSF) {
 export function makeResultJson(gameInstance: SLPSF) {
   try {
     const { settings, playerData } = gameInstance;
-    const credits = gameInstance.getPlayerData().credits
-    const Balance = credits.toFixed(2)
+    const credits = gameInstance.getPlayerData().credits + playerData.currentWining
+    const Balance = credits.toFixed(3)
     const sendData = {
       GameData: {
         resultSymbols: settings.resultSymbolMatrix,
         linesToEmit: settings._winData.winningLines,
         symbolsToEmit: settings._winData.winningSymbols,
-        jackpot: settings._winData.jackpotwin,
-        isFreeSpin: settings.freeSpin.useFreeSpin,
-        freeSpinCount: settings.freeSpin.freeSpinCount,
+        freeSpins: {
+          count: settings.freeSpin.freeSpinCount,
+          isNewAdded: settings.freeSpin.freeSpinsAdded,
+          jokerSymbols: settings.freeSpin.jokerSymbols,
+          trumpSymbols: settings.freeSpin.trumpSymbols
+        },
       },
       PlayerData: {
         Balance: Balance,
         totalbet: playerData.totalbet,
         haveWon: playerData.haveWon,
+        currentWining: playerData.currentWining
       }
     };
     gameInstance.sendMessage('ResultData', sendData);
