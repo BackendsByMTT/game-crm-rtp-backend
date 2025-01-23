@@ -321,6 +321,9 @@ export function checkForWin(gameInstance: SLSM) {
        
         // Reset game state after payout
         makeResultJson(gameInstance)
+        if(settings.isMoonJackpot){
+            settings.isMoonJackpot = false;
+        }
         settings._winData.totalWinningAmount = 0;
         gameInstance.playerData.currentWining = 0;
         settings.freeSpin.freeSpinPayout = 0;
@@ -329,7 +332,7 @@ export function checkForWin(gameInstance: SLSM) {
         gameInstance.settings.bonusSymbolValue = []
         settings.isGrandPrize = false;
         settings.isAllWild = false;
-    } catch (error) {
+    } catch (error) { 
         console.error("Error in checkForWin", error);
         return [];
     }

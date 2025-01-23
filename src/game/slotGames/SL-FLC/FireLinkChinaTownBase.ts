@@ -2,7 +2,7 @@ import { sessionManager } from "../../../dashboard/session/sessionManager";
 import { currentGamedata } from "../../../Player";
 import { RandomResultGenerator } from "../RandomResultGenerator";
 import { generateBonusReel } from "./bonus";
-import { initializeGameSettings, generateInitialReel, sendInitData, makePayLines, checkForWin, makeResultJson } from "./helper";
+import { initializeGameSettings, generateInitialReel, sendInitData, makePayLines, checkForWin } from "./helper";
 import { SLFLCSETTINGS } from "./types";
 
 export class SLFLC {

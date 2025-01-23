@@ -1,6 +1,5 @@
 
 
-import { log } from "console";
 import { ScatterPayEntry, BonusPayEntry, specialIcons, bonusGameType, ResultType } from "../../Utils/gameUtils";
 import BaseSlotGame from "./BaseSlotGame";
 import { BonusGame, runMiniSpin } from "./BonusGame";
@@ -94,7 +93,8 @@ export class CheckResult {
             if (this.currentGame.settings.currentGamedata.bonus.type == bonusGameType.miniSpin) {
                 const betPerLines = this.currentGame.settings.BetPerLines;
                 this.currentGame.settings.currentGamedata.bonus.noOfItem = temp.length;
-                const result = runMiniSpin(this.currentGame.settings.currentGamedata.bonus, betPerLines);
+        
+                const result = runMiniSpin(this.currentGame.settings.currentGamedata.bonus, this.currentGame.settings.bonus.symbolCount , betPerLines);
                 this.bonusResult = result
                 this.currentGame.settings._winData.totalWinningAmount += result.totalWinAmount;
             }
@@ -360,6 +360,7 @@ export class CheckResult {
 
             }
         };
+    
         // this.currentGame.updateDatabase()
         if (isResult == ResultType.normal)
             this.currentGame.sendMessage("ResultData", ResultData);
