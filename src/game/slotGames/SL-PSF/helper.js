@@ -144,7 +144,6 @@ function checkForWin(gameInstance) {
                                 settings._winData.winningSymbols.push(validIndices);
                                 settings._winData.totalWinningAmount = totalPayout * settings.BetPerLines;
                                 playerData.currentWining = settings._winData.totalWinningAmount;
-                                playerData.haveWon += settings._winData.totalWinningAmount;
                             }
                             break;
                         default:

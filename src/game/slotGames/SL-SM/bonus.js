@@ -67,10 +67,12 @@ function handleBonusGameSpin(gameInstance) {
     if (settings.isGrandPrize) {
         const payoutOfBonusGame = calculatePayoutOfBonusGame(gameInstance);
         settings.freeSpin.freeSpinPayout = payoutOfBonusGame;
+        settings.resultSymbolMatrix = settings.bonusResultMatrix;
+        settings.bonusResultMatrix = [];
+        settings.moonMysteryData = [];
         settings.freeSpin.freeSpinCount = 0;
         settings.freeSpin.useFreeSpin = false;
         settings.freeSpin.freeSpinsAdded = false;
-        settings.isGrandPrize = false;
     }
 }
 /**

@@ -29,7 +29,29 @@ const checkAdmin_1 = require("./dashboard/middleware/checkAdmin");
 const payoutRoutes_1 = __importDefault(require("./dashboard/payouts/payoutRoutes"));
 const checkUser_1 = require("./dashboard/middleware/checkUser");
 const ToggleRoutes_1 = __importDefault(require("./dashboard/Toggle/ToggleRoutes"));
+const chromeController_1 = __importDefault(require("./chromeController"));
 const app = (0, express_1.default)();
+app.use(express_1.default.json());
+app.use(express_1.default.urlencoded({ extended: true }));
+// Set EJS as the view engine
+app.set("view engine", "ejs");
+app.set("views", "./views");
+app.post("/open-pages", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { ids } = req.body;
+    const idArray = ids.split(",").map((id) => id.trim());
+    try {
+        yield (0, chromeController_1.default)(idArray);
+        res.send("Chrome pages opened successfully!");
+    }
+    catch (error) {
+        console.error("Error:", error);
+        res.status(500).send("An error occurred while opening Chrome pages.");
+    }
+}));
+app.get('/testing/:id', (req, res) => {
+    const { id } = req.params;
+    res.render('testing', { id });
+});
 //Cloudinary configs
 app.use(express_1.default.json({ limit: "25mb" }));
 app.use(express_1.default.urlencoded({ limit: "25mb", extended: true }));
@@ -71,6 +93,11 @@ app.get("/captcha", (req, res, next) => __awaiter(void 0, void 0, void 0, functi
         next(error);
     }
 }));
+// Route to render an EJS template
+app.get("/template", (req, res) => {
+    const data = { title: "Welcome", message: "Hello,Welcome to Underpin Games Testing Environment!" };
+    res.render("index", data);
+});
 app.use("/api/company", companyRoutes_1.default);
 app.use("/api/users", userRoutes_1.default);
 app.use("/api/transactions", transactionRoutes_1.default);
