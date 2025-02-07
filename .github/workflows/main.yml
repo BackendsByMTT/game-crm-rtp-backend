@@ -1,119 +1,51 @@
-name: Build and Deploy
+name: Deploy Server
 
 on:
   push:
     branches:
-      - "dev"
-  workflow_dispatch:
-
-permissions:
-  contents: write
-  pull-requests: write
+      - dev-build  # Trigger on push to the dev branch
 
 jobs:
-  build:
+  deploy:
+    name: Deploy to EC2
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.5.3
         with:
-          ref: dev
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install Dependencies
-        run: npm install
-
-      - name: Build
-        run: npm run build
-   
-      - name: Push updated package.json to dev-build branch
-        env:
-          GITHUB_TOKEN: ${{ secrets.G_TOKEN }}
+      - name: Deploy to EC2
         run: |
-           git fetch origin dev-build:dev-build # Ensure you're up-to-date with dev-build
-           git checkout dev-build
-           git config user.name "TrippyRahul" 
-           git config user.email "rahulrawat.trippybug@gmail.com"
-           rm -f package.json
-           git checkout dev -- package.json
-           git add package.json
-           git commit -m "update package.json" || echo "No changes to commit"
-           git push --force origin dev-build
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
+            # Switch to root user
+            sudo -i
+            whoami 
 
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: artifact
-          path: ./dist/**/*.js
+            # Clone the repository if it doesn't already exist
+            git clone https://github.com/BackendsByMTT/game-crm-rtp-backend.git || { echo "Repo already exists"; }
 
-      - name: Commit and Push Build Artifacts
-        env:
-          GITHUB_TOKEN: ${{ secrets.G_TOKEN }}
-        run: |
-          git config advice.addIgnoredFile false
-          git rev-parse --abbrev-ref HEAD
-          git config --global user.name "TrippyRahul"
-          git config --global user.email "rahulrawat.trippybug@gmail.com"
-          git checkout -b build-artifacts
-          git add -f ./dist
-          git commit -m 'added: build artifacts'
-          git push --set-upstream origin build-artifacts
+            # Ensure correct permissions for the project directory
+            sudo chown -R $USER:$USER .
+            cd game-crm-rtp-backend || { echo "Failed to navigate to project directory"; exit 1; }
 
-  create_pull_request:
-    needs: build
-    runs-on: ubuntu-latest
-    outputs:
-      pull_request_number: ${{ steps.create_pr.outputs.pull-request-number }}
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+            # Pull the latest changes from the dev branch
+            git checkout dev-build
+            git pull origin dev-build
 
-      - name: Download Build Artifacts
-        uses: actions/download-artifact@v3
-        with:
-          name: artifact
+            # Create the .env file
+            echo "${{ secrets.ENV_CONTENT }}" > .env
+            [ -f .env ] && echo ".env file created successfully" || { echo "Failed to create .env file"; exit 1; }
 
-      - name: List Downloaded Artifacts
-        run: ls -l
+            # Install dependencies and build the frontend
+            npm install || { echo "npm install failed"; exit 1; }
 
-      - name: Create Pull Request
-        id: create_pr
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.G_TOKEN }}
-          commit-message: "added: build artifacts"
-          branch: build-artifacts
-          base: dev-build
-          title: "Add build artifacts"
-          body: "This pull request contains the build artifacts."
-          labels: "auto-approve"
+            # Restart or start the frontend application with PM2
+            pm2 restart backendapp || pm2 start npm --name backendapp -- start || { echo "PM2 command failed"; exit 1; }
 
-  merge_pull_request:
-    needs: create_pull_request
-    runs-on: ubuntu-latest
-    steps:
-      - name: Merge Pull Request
-        run: |
-          PR_NUMBER="${{ needs.create_pull_request.outputs.pull_request_number }}"
-          curl -X PUT \
-            -H "Authorization: token ${{ secrets.G_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}/merge
-
-  cleanup:
-    if: ${{ always() }}
-    needs: [merge_pull_request, build]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Delete Build Artifacts Branch
-        env:
-          GITHUB_TOKEN: ${{ secrets.G_TOKEN }}
-        run: |
-          git push origin --delete build-artifacts
+            echo "Backend deployment completed."
+          EOF
