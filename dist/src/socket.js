@@ -68,7 +68,7 @@ const handlePlayerConnection = (socket, decoded, userAgent) => __awaiter(void 0,
     const { credits, status, managerName } = yield getPlayerDetails(username);
     let existingPlayer = sessionManager_1.sessionManager.getPlayerPlatform(username);
     let sessionData = {};
-    const stickySessionCookie = socket.handshake.headers.awsALBCookie;
+    const stickySessionCookie = socket.handshake.auth.awsALBCookie;
     console.log(stickySessionCookie, 'stickySessionCookie');
     const redisSession = yield redisClient_1.pubClient.get(`socket:${username}`);
     if (redisSession) {
