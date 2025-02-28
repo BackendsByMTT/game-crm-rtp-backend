@@ -188,6 +188,13 @@ const socketController = (io: Server) => {
             const decoded = await verifySocketToken(socket);
             (socket as any).decoded = { ...decoded };
             (socket as any).userAgent = userAgent;
+            const cookies = socket.handshake.headers.cookie || "";
+            const awsALBCookie = cookies.split("; ").find((c) => c.startsWith("AWSALBTG"));
+            const awsALBTGCORSCookie = cookies.split("; ").find((c) => c.startsWith("AWSALBTGCORS"));
+
+            if (!awsALBCookie || !awsALBTGCORSCookie) {
+                return next(new Error("Authentication failed"));
+            }
             next();
         } catch (error) {
             console.error("Authentication error:", error.message);
