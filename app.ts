@@ -104,6 +104,8 @@ const startServer = async () => {
         message: "OK",
         timestamp: new Date().toLocaleDateString(),
         worker: process.pid,
+        numCPUs: numCPUs,
+
       });
     });
 
