@@ -143,7 +143,7 @@ const startServer = async () => {
         methods: ["GET", "POST"],
       },
       transports: ["websocket"],
-      pingInterval: 25000,
+      pingInterval: 60000,
       pingTimeout: 60000,
       allowEIO3: false,
     });
