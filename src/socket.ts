@@ -180,7 +180,8 @@ const handlePlayerConnection = async (socket: Socket, decoded: DecodedToken, use
         socket.emit(messageType.ERROR, `Error in handlePlayerConnection for user ${decoded?.username || 'unknown'}: ${error.message}`);
         socket.disconnect(true);
     }
-};;
+};
+
 
 
 const handleManagerConnection = async (socket: Socket, decoded: DecodedToken, userAgent: string) => {
