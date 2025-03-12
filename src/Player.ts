@@ -289,11 +289,10 @@ export default class PlayerSocket {
     } else {
       console.log("Testing environment detected. Skipping user-agent validation.");
     }
-    console.log("Initializing game socket connection.");
+    socket.emit(messageType.ALERT, "Initializing game socket connection.");
 
     // Delay-based retry to ensure platform stability
     await new Promise(resolve => setTimeout(resolve, 500));
-
 
     console.log("Initializing game socket connection after platform stability confirmed.");
 

@@ -183,6 +183,7 @@ const handlePlayerConnection = async (socket: Socket, decoded: DecodedToken, use
 };
 
 
+
 const handleManagerConnection = async (socket: Socket, decoded: DecodedToken, userAgent: string) => {
     const username = decoded.username;
     const role = decoded.role

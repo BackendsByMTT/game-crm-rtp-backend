@@ -139,6 +139,8 @@ export class UserController {
     try {
       const { username, password } = req.body;
 
+      console.log("Login request:", username, password);
+
       if (!username || !password) {
         throw createHttpError(400, "Username, password are required");
       }
