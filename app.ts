@@ -1,170 +1,101 @@
-import cluster from "cluster";
-import os from "os";
-import express, { NextFunction, Request, Response } from "express";
-import cors from "cors";
-import { createServer } from "http";
-import { Server } from "socket.io";
-import { setupMaster, setupWorker } from "@socket.io/sticky";
-import { createAdapter, setupPrimary } from "@socket.io/cluster-adapter";
-import svgCaptcha from "svg-captcha";
-import createHttpError from "http-errors";
-import connectDB from "./src/config/db";
+import express from 'express';
+import cluster from 'cluster';
+import sticky from 'sticky-session';
+import { createServer } from 'http';
+import cors from 'cors';
+import { config } from './src/config/config';
+import mongoose from 'mongoose';
+import os from 'os';
+import session, { SessionData } from 'express-session';
+import adminRoutes from './src/dashboard/admin/adminRoutes';
+import userRoutes from './src/dashboard/users/userRoutes';
+import transactionRoutes from './src/dashboard/transactions/transactionRoutes';
+import gameRoutes from './src/dashboard/games/gameRoutes';
+import { checkUser } from './src/dashboard/middleware/checkUser';
+import { checkRole } from './src/dashboard/middleware/checkRole';
+import payoutRoutes from './src/dashboard/payouts/payoutRoutes';
+import toggleRoutes from './src/dashboard/Toggle/ToggleRoutes';
+import sessionRoutes from './src/dashboard/session/sessionRoutes';
+import { setupWebSocket } from './src/server';
+import connectDB from './src/config/db';
 
-// Import custom middleware and routes
-import globalErrorHandler from "./src/dashboard/middleware/globalHandler";
-import adminRoutes from "./src/dashboard/admin/adminRoutes";
-import userRoutes from "./src/dashboard/users/userRoutes";
-import transactionRoutes from "./src/dashboard/transactions/transactionRoutes";
-import gameRoutes from "./src/dashboard/games/gameRoutes";
-import payoutRoutes from "./src/dashboard/payouts/payoutRoutes";
-import toggleRoutes from "./src/dashboard/Toggle/ToggleRoutes";
-import sessionRoutes from "./src/dashboard/session/sessionRoutes";
 
-// Import other utilities and controllers
-import { config } from "./src/config/config";
-import { checkUser } from "./src/dashboard/middleware/checkUser";
-import { checkRole } from "./src/dashboard/middleware/checkRole";
-import socketController from "./src/socket";
+const app = express();
 
-// Extend express-session type to include custom properties
-declare module "express-session" {
-  interface Session {
-    captcha?: string;
-  }
-}
-
-const numCPUs = os.cpus().length;
-
-const startServer = async () => {
-  await connectDB();
-
-  if (cluster.isPrimary) {
-    console.log(`primary ${process.pid} is running`);
-
-    // try {
-    //   console.log("Connected to database successfully");
-    // } catch (error) {
-    //   console.error("Database connection failed:", error);
-    //   process.exit(1);
-    // }
-
-    const httpServer = createServer();
-
-    setupMaster(httpServer, {
-      loadBalancingMethod: "least-connection",
-    });
-
-    setupPrimary();
-
-    const PORT = config.port;
-    httpServer.listen(PORT, () => {
-      console.log(`Primary load balancer running on port ${PORT}`);
-    });
-
-    for (let i = 0; i < numCPUs; i++) {
-      cluster.fork();
-    }
-
-    cluster.on("exit", (worker) => {
-      console.log(`Worker ${worker.process.pid} died. Restarting...`);
-      cluster.fork();
-    });
-
-  } else {
-    console.log(`Worker process ${process.pid} is running`);
-
-    const app = express();
-
-    // Middleware setup
-    app.use(express.json({ limit: "25mb" }));
-    app.use(express.urlencoded({ limit: "25mb", extended: true }));
-    app.use(
-      cors({
-        origin: [`*.${config.hosted_url_cors}`, "https://game-crm-rtp-backend.onrender.com"],
-        credentials: true,
-      })
-    );
-
-    // Set custom headers for CORS
-    app.use((req, res, next) => {
-      res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
-      res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-      res.setHeader("Access-Control-Allow-Credentials", "true");
-      if (req.method === "OPTIONS") {
-        return res.sendStatus(200);
-      }
-      next();
-    });
-
-    // Health check route
-    app.get("/", (req: Request, res: Response) => {
-      res.status(200).json({
-        uptime: process.uptime(),
-        message: "OK",
-        timestamp: new Date().toLocaleDateString(),
-        worker: process.pid,
-        numCPUs: numCPUs,
-
-      });
-    });
-
-    // Captcha route
-    app.get("/captcha", async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const captcha = svgCaptcha.create();
-        if (captcha) {
-          req.session.captcha = captcha.text;
-          res.status(200).json({ data: captcha.data });
-        } else {
-          throw createHttpError(404, "Error Generating Captcha, Please refresh!");
-        }
-      } catch (error) {
-        next(error);
-      }
-    });
-
-    // API routes
-    app.use("/api/company", adminRoutes);
-    app.use("/api/users", userRoutes);
-    app.use("/api/transactions", transactionRoutes);
-    app.use("/api/games", gameRoutes);
-    app.use("/api/payouts", checkUser, checkRole(["admin"]), payoutRoutes);
-    app.use("/api/toggle", checkUser, checkRole(["admin"]), toggleRoutes);
-    app.use("/api/session", sessionRoutes);
-
-    // Initialize HTTP server
-    const httpServer = createServer(app);
-
-    // Initialize Socket.IO
-    const io = new Server(httpServer, {
-      cors: {
-        origin: "*",
-        methods: ["GET", "POST"],
-      },
-      transports: ["websocket"],
-      pingInterval: 25000,
-      pingTimeout: 60000,
-      allowEIO3: false
-    });
-
-    // Setup cluster adapter and worker
-    io.adapter(createAdapter());
-    setupWorker(io);
-
-    // Initialize Socket.IO logic
-    socketController(io);
-
-    // Global error handler
-    app.use(globalErrorHandler);
-
-    // Start the server
-    // httpServer.listen(config.port, () => {
-    //   console.log(`Worker process listening on port ${config.port}`);
-    // });
-  }
+// CORS for WebSockets and Express API
+const corsOptions = {
+  origin: config.allowedOrigins,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], // Allow only major HTTP methods
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'], // Allow essential headers
+  credentials: true // Allow cookies and Authorization headers
 };
 
-startServer().catch((error) => {
-  console.error("Error starting server:", error);
+// Middleware
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(cors(corsOptions));
+
+
+// Health check endpoint
+app.get('/health', async (req, res) => {
+  const healthInfo = {
+    status: 'Healthy', // Professional yet clear
+    uptime: `${Math.floor(process.uptime() / 60)} minutes`,
+    timestamp: new Date().toLocaleString(),
+    memoryUsage: {
+      total: `${(process.memoryUsage().heapTotal / 1024 / 1024).toFixed(2)} MB`,
+      used: `${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB`
+    },
+    cpuLoad: {
+      '1 min avg': os.loadavg()[0].toFixed(2),
+      '5 min avg': os.loadavg()[1].toFixed(2),
+      '15 min avg': os.loadavg()[2].toFixed(2)
+    },
+    platform: {
+      os: os.platform(),
+      architecture: os.arch(),
+      nodeVersion: process.version
+    },
+    workers: cluster.isWorker ? `Worker ID: ${cluster.worker.id}` : 'Master Process',
+    database: {
+      status: mongoose.connection.readyState === 1 ? 'Connected' : 'Not Connected',
+      host: mongoose.connection.host
+    },
+    allowedOrigins: config.allowedOrigins
+  };
+
+  res.json(healthInfo);
+});
+
+
+// Serve static files
+app.use(express.static('public'));
+
+// API routes
+app.use('/api/company', adminRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/transactions", transactionRoutes);
+app.use("/api/games", gameRoutes);
+app.use("/api/payouts", checkUser, checkRole(["admin"]), payoutRoutes);
+app.use("/api/toggle", checkUser, checkRole(["admin"]), toggleRoutes);
+app.use("/api/session", sessionRoutes);
+
+// Serve the HTML file for the frontend
+app.get('/', (req, res) => {
+  res.sendFile('index.html', { root: './' });
+});
+
+// Connect Mongodb before starting the server
+connectDB().then(() => {
+  const server = createServer(app);
+  if (!sticky.listen(server, Number(config.port))) {
+    // Master Process
+    server.once("listening", () => console.log(`🚀 Server started on port ${config.port}`));
+  } else {
+    // Worker Process (WebSocket Handling)
+    setupWebSocket(server, corsOptions);
+  }
+}).catch((err) => {
+  console.error("❌ Failed to connect to database:", err);
+  process.exit(1);
 });
