@@ -7,7 +7,6 @@ import { config } from './src/config/config';
 import mongoose from 'mongoose';
 import os from 'os';
 import session, { SessionData } from 'express-session';
-import svgCaptcha from 'svg-captcha';
 import adminRoutes from './src/dashboard/admin/adminRoutes';
 import userRoutes from './src/dashboard/users/userRoutes';
 import transactionRoutes from './src/dashboard/transactions/transactionRoutes';
@@ -18,10 +17,8 @@ import payoutRoutes from './src/dashboard/payouts/payoutRoutes';
 import toggleRoutes from './src/dashboard/Toggle/ToggleRoutes';
 import sessionRoutes from './src/dashboard/session/sessionRoutes';
 import { setupWebSocket } from './src/server';
+import connectDB from './src/config/db';
 
-interface CustomSessionData extends SessionData {
-  captcha?: string;
-}
 
 const app = express();
 
@@ -37,12 +34,7 @@ const corsOptions = {
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cors(corsOptions));
-app.use(session({
-  secret: config.jwtSecret,
-  resave: false,
-  saveUninitialized: true,
-  cookie: { secure: false } // Set to `true` if using HTTPS
-}));
+
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
@@ -75,21 +67,6 @@ app.get('/health', async (req, res) => {
   res.json(healthInfo);
 });
 
-// CAPTCHA endpoint
-app.get('/captcha', (req, res) => {
-  const captcha = svgCaptcha.create({
-    size: 6, // Length of the captcha text
-    noise: 3, // Number of noise lines
-    color: true, // Colored text
-    background: '#f4f4f4', // Light background
-    ignoreChars: '0oO1Il', // Avoid confusing characters
-    height: 50 // Height of the image
-  });
-
-  (req.session as CustomSessionData).captcha = captcha.text; // Store CAPTCHA text in session
-
-  res.type('svg').send(captcha.data); // Return SVG image
-});
 
 // Serve static files
 app.use(express.static('public'));
@@ -108,13 +85,17 @@ app.get('/', (req, res) => {
   res.sendFile('index.html', { root: './' });
 });
 
-const server = createServer(app);
-
-if (!sticky.listen(server, Number(config.port))) {
-  // Master process
-  server.once('listening', () => {
-    console.log(`🚀 Server started on port ${config.port}`);
-  });
-} else {
-  setupWebSocket(server, corsOptions);
-}
+// Connect Mongodb before starting the server
+connectDB().then(() => {
+  const server = createServer(app);
+  if (!sticky.listen(server, Number(config.port))) {
+    // Master Process
+    server.once("listening", () => console.log(`🚀 Server started on port ${config.port}`));
+  } else {
+    // Worker Process (WebSocket Handling)
+    setupWebSocket(server, corsOptions);
+  }
+}).catch((err) => {
+  console.error("❌ Failed to connect to database:", err);
+  process.exit(1);
+});

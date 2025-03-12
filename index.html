@@ -241,6 +241,7 @@
   </style>
 </head>
 
+
 <body>
   <div class="container">
     <h1>Slot Game Platform</h1>
@@ -259,68 +260,109 @@
     <div class="login-panel">
       <div class="input-group">
         <input type="text" id="username" placeholder="Enter your username">
-        <button onclick="connectGame()">Connect to Game</button>
+        <input type="text" id="playground-id" placeholder="Playground ID">
+        <button onclick="connectToPlayground()">Connect to Playground</button>
+      </div>
+      <div class="input-group" style="margin-top: 10px;">
+        <button onclick="connectGame()" id="game-connect-btn" disabled>Connect to Game</button>
       </div>
     </div>
 
     <div id="game-controls" class="game-controls">
-      <div class="controls-header">
-        <h2 class="controls-title">Game Controls</h2>
-        <span id="balance">Balance: $1000</span>
-      </div>
+      <!-- ...existing code... -->
+    </div>
 
-      <div class="spin-buttons">
-        <button onclick="spin()" class="spin-button primary-button">Spin</button>
-        <button onclick="toggleAutoSpin()" id="auto-spin-btn" class="spin-button secondary-button">Auto Spin</button>
-      </div>
-
-      <div class="auto-spin-container">
-        <div class="auto-spin-header">
-          <h3>Auto Spin Count</h3>
-          <div class="spin-counter">
-            <button onclick="updateSpinCount(-1)" class="counter-button">-</button>
-            <span id="spin-count">10</span>
-            <button onclick="updateSpinCount(1)" class="counter-button">+</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="result-display">
-        <h3>Last Result</h3>
-        <p id="result-text">Spin to see results</p>
-      </div>
+    <div id="alerts" class="alerts"
+      style="margin-top: 20px; background: #44475a; border-radius: 8px; padding: 15px; display: none;">
+      <h3>System Alerts</h3>
+      <div id="alert-messages" style="max-height: 150px; overflow-y: auto;"></div>
     </div>
   </div>
 
   <script>
-    const platformSocket = io("http://localhost:5001/platform", { withCredentials: true });
+    // Auth token - you should implement a proper login system to get this
+    const authToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3MTlkNzQ3NTBiOWUyNDVjYmFjNjdjZCIsInVzZXJuYW1lIjoidGVzdC1wbGF5ZXItNCIsInJvbGUiOiJwbGF5ZXIiLCJpYXQiOjE3NDE3NzUxNzUsImV4cCI6MTc0MjM3OTk3NX0.1gFQIGI8bGlvlqVwXD4D4aHjfjami7Aweps_dFLP-5c";
+
+    // Socket connections
+    let playgroundSocket = null;
     let gameSocket = null;
+
+    // Game state
     let balance = 1000;
     let autoSpinCount = 10;
     let isAutoSpinning = false;
     let autoSpinInterval = null;
 
-    // Update platform connection status
-    platformSocket.on('connect', () => {
-      document.getElementById('platform-status').innerText = "Connected";
-      document.getElementById('platform-status').className = "status connected";
-      console.log("✅ Connected to Platform Namespace");
+    // Connect to the playground namespace
+    function connectToPlayground() {
+      const username = document.getElementById('username').value.trim();
+      const playgroundId = document.getElementById('playground-id').value.trim();
 
-      // Simulate a login event
-      platformSocket.emit('login', { username: "Guest" });
-    });
+      if (!username) {
+        showAlert("Please enter a username first!", "error");
+        return;
+      }
 
-    platformSocket.on('disconnect', () => {
-      document.getElementById('platform-status').innerText = "Disconnected";
-      document.getElementById('platform-status').className = "status disconnected";
-      console.log("❌ Disconnected from Platform Namespace");
-    });
+      if (!playgroundId) {
+        showAlert("Please enter a playground ID!", "error");
+        return;
+      }
+
+      // Prevent multiple connections
+      if (playgroundSocket) {
+        playgroundSocket.disconnect();
+      }
+
+      // Connect to playground namespace
+      playgroundSocket = io('http://localhost:5001/playground', {
+        withCredentials: true,
+        auth: {
+          token: authToken,
+          playgroundId: playgroundId
+        }
+      });
+
+      playgroundSocket.on('connect', () => {
+        document.getElementById('platform-status').innerText = "Connected";
+        document.getElementById('platform-status').className = "status connected";
+        showAlert("✅ Connected to Playground", "success");
+
+        // Enable game connect button
+        document.getElementById('game-connect-btn').disabled = false;
+      });
+
+      playgroundSocket.on('disconnect', () => {
+        document.getElementById('platform-status').innerText = "Disconnected";
+        document.getElementById('platform-status').className = "status disconnected";
+        showAlert("❌ Disconnected from Playground", "error");
+
+        // Disable game connect button
+        document.getElementById('game-connect-btn').disabled = true;
+      });
+
+      playgroundSocket.on('error', (error) => {
+        showAlert(`Error: ${error.message}`, "error");
+        playgroundSocket.disconnect();
+      });
+
+      playgroundSocket.on('alert', (data) => {
+        showAlert(data.message, data.type || "info");
+      });
+
+
+
+      playgroundSocket.on('kicked', (data) => {
+        showAlert(`You were kicked: ${data.message}`, "error");
+        playgroundSocket.disconnect();
+      });
+    }
 
     // Connect to the game namespace
     function connectGame() {
       const username = document.getElementById('username').value.trim();
-      if (!username) {
-        alert("Please enter a username before connecting to the game!");
+
+      if (!playgroundSocket || !playgroundSocket.connected) {
+        showAlert("You must connect to a Playground first!", "error");
         return;
       }
 
@@ -329,12 +371,18 @@
         gameSocket.disconnect();
       }
 
-      gameSocket = io('http://localhost:5001/game', { withCredentials: true });
+      gameSocket = io('http://localhost:5001/game', {
+        withCredentials: true,
+        auth: {
+          token: authToken,
+          gameId: "TEST GAME ID"
+        },
+      });
 
       gameSocket.on('connect', () => {
         document.getElementById('game-status').innerText = "Connected";
         document.getElementById('game-status').className = "status connected";
-        console.log("🎮 Connected to Game Namespace");
+        showAlert("🎮 Connected to Game", "success");
 
         // Show game controls
         document.getElementById('game-controls').style.display = 'block';
@@ -346,13 +394,17 @@
       gameSocket.on('disconnect', () => {
         document.getElementById('game-status').innerText = "Disconnected";
         document.getElementById('game-status').className = "status disconnected";
-        console.log("❌ Disconnected from Game Namespace");
+        showAlert("❌ Disconnected from Game", "error");
 
         // Hide game controls
         document.getElementById('game-controls').style.display = 'none';
 
         // Stop auto-spin if active
         stopAutoSpin();
+      });
+
+      gameSocket.on('error', (error) => {
+        showAlert(`Game Error: ${error.message}`, "error");
       });
 
       gameSocket.on('spin-result', (data) => {
@@ -379,6 +431,41 @@
           }
         }
       });
+
+      gameSocket.on('balance-update', (data) => {
+        if (data.credits !== undefined) {
+          balance = data.credits;
+          updateBalance();
+        }
+      });
+    }
+
+    // Show alerts in the UI
+    function showAlert(message, type = "info") {
+      const alertsDiv = document.getElementById('alerts');
+      const messagesDiv = document.getElementById('alert-messages');
+
+      // Create alert element
+      const alertEl = document.createElement('div');
+      alertEl.className = `alert ${type}`;
+      alertEl.style.padding = "8px";
+      alertEl.style.marginBottom = "8px";
+      alertEl.style.borderLeft = type === "error" ? "4px solid #ff5555" :
+        type === "success" ? "4px solid #50fa7b" :
+          "4px solid #bd93f9";
+
+      // Add timestamp
+      const now = new Date();
+      const timestamp = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+      alertEl.innerHTML = `<small>[${timestamp}]</small> ${message}`;
+
+      // Add to DOM
+      messagesDiv.appendChild(alertEl);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+      // Show alerts container
+      alertsDiv.style.display = 'block';
     }
 
     // Update balance display
@@ -395,13 +482,13 @@
     // Spin function
     function spin() {
       if (!gameSocket || !gameSocket.connected) {
-        alert("Please connect to the game first!");
+        showAlert("Please connect to the game first!", "error");
         return;
       }
 
       // Check balance
       if (balance < 10) {
-        alert("Not enough balance to spin!");
+        showAlert("Not enough balance to spin!", "error");
         stopAutoSpin();
         return;
       }
@@ -422,7 +509,7 @@
     // Start auto-spin
     function startAutoSpin() {
       if (!gameSocket || !gameSocket.connected) {
-        alert("Please connect to the game first!");
+        showAlert("Please connect to the game first!", "error");
         return;
       }
 
@@ -456,5 +543,6 @@
     }
   </script>
 </body>
+
 
 </html>
