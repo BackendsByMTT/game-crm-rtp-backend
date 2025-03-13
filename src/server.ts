@@ -25,12 +25,31 @@ export function setupWebSocket(server: any, corsOptions: any) {
     const namespaces = {
         playground: io.of("/playground"),
         control: io.of("/control"),
-        // game: io.of("/game")
+        game: io.of("/game")
     };
 
     Object.values(namespaces).forEach((ns) => ns.use(socketAuth));
 
-    io.on("connection", async (socket) => {
+    // io.on("connection", async (socket) => {
+    //     const { username, role, userAgent } = socket.data.user;
+    //     const gameId = socket.handshake.auth.gameId;
+    //     if (role !== "player") return socket.disconnect();
+
+    //     console.log(`🎰 Player ${username} is attempting to enter the Arena`);
+    //     let existingSession = sessionManager.getPlayerPlatform(username);
+    //     // Check if player has an active playground session
+    //     if (!existingSession || !existingSession.platformData?.socket.connected) {
+    //         return disconnectWithError(socket, "You must be connected to a Playground first.");
+    //     }
+
+    //     // Always treat `updateGameSocket` as the first game session entry
+    //     console.log(`🎰 Player ${username} entering game, updating socket session`);
+    //     await existingSession.updateGameSocket(socket);
+    //     existingSession.sendAlert(`🎰 Welcome to the Arena : ${existingSession.currentGameData.gameId}`);
+
+    // });
+
+    namespaces.game.on("connection", async (socket) => {
         const { username, role, userAgent } = socket.data.user;
         const gameId = socket.handshake.auth.gameId;
         if (role !== "player") return socket.disconnect();
@@ -46,7 +65,6 @@ export function setupWebSocket(server: any, corsOptions: any) {
         console.log(`🎰 Player ${username} entering game, updating socket session`);
         await existingSession.updateGameSocket(socket);
         existingSession.sendAlert(`🎰 Welcome to the Arena : ${existingSession.currentGameData.gameId}`);
-
     });
 
     // **Playground Namespace (For Players)**
@@ -97,9 +115,6 @@ export function setupWebSocket(server: any, corsOptions: any) {
         socket.on("kick-player", (playerId) => namespaces.playground.to(playerId).emit("kicked", { message: "You have been removed by an admin" }));
         socket.on("disconnect", () => console.log(`🛠️ ${role} ${username} left the Control Room`));
     });
-
-
-
 
     console.log(`⚡ WebSocket server running on worker ${cluster.worker?.id}`);
 }
