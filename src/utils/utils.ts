@@ -148,7 +148,7 @@ export const updateCredits = async (
   try {
     const clientSocket = sessionManager.getPlatformSessions().get(client.username);
     if (clientSocket) {
-      if (clientSocket.gameData.socket || clientSocket.currentGameData.gameId) {
+      if (clientSocket.currentGameData.socket || clientSocket.currentGameData.gameId) {
         throw createHttpError(409, "Cannot recharge while in a game")
       }
     }

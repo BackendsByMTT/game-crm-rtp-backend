@@ -6,7 +6,6 @@ import cors from 'cors';
 import { config } from './src/config/config';
 import mongoose from 'mongoose';
 import os from 'os';
-import session, { SessionData } from 'express-session';
 import adminRoutes from './src/dashboard/admin/adminRoutes';
 import userRoutes from './src/dashboard/users/userRoutes';
 import transactionRoutes from './src/dashboard/transactions/transactionRoutes';
@@ -18,6 +17,7 @@ import toggleRoutes from './src/dashboard/Toggle/ToggleRoutes';
 import sessionRoutes from './src/dashboard/session/sessionRoutes';
 import { setupWebSocket } from './src/server';
 import connectDB from './src/config/db';
+import globalErrorHandler from './src/dashboard/middleware/globalHandler';
 
 
 const app = express();
@@ -84,6 +84,8 @@ app.use("/api/session", sessionRoutes);
 app.get('/', (req, res) => {
   res.sendFile('index.html', { root: './' });
 });
+
+app.use(globalErrorHandler);
 
 // Connect Mongodb before starting the server
 connectDB().then(() => {

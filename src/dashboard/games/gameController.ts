@@ -144,29 +144,51 @@ export class GameController {
     try {
       const _req = req as AuthRequest;
       const { username, role } = _req.user;
-
       const { gameId: slug } = req.params;
 
-      const currentPlayer = await Player.aggregate([
-        { $match: { username: username, role: role, status: "active" } },
-        { $limit: 1 }
-      ]);
+      // Validate request parameters
+      if (!slug) {
+        throw createHttpError(400, "Game ID parameter is required");
+      }
 
-      if (!currentPlayer[0]) {
-        console.log('user is inactive contact to your store')
-        throw createHttpError(403, "user is inactive contact to your store")
+      // Check if player exists and is active
+      const currentPlayer = await Player.findOne({
+        username,
+        role,
+        status: "active"
+      }).lean();
+
+
+      if (!currentPlayer) {
+        console.log(`Player ${username} is inactive`);
+        throw createHttpError(403, "Account is inactive, please contact support");
       }
 
       if (!slug) {
         throw createHttpError(400, "Slug parameter is required");
       }
 
-      const existingUser = sessionManager.getPlayerPlatform(username)
+      // Get player session and validate connection state
+      const existingSession = sessionManager.getPlayerPlatform(username);
 
-      if (existingUser && existingUser.gameData.socket) {
-        throw createHttpError(403, "You already have an active game session. Please wait for a while before disconnecting")
+      if (!existingSession) {
+        // No session exists at all
+        console.log(`No session found for player ${username}`);
+        throw createHttpError(403, "No active session found. Please reconnect to the platform");
       }
 
+      // Enhanced logging for debugging connection state
+      const gameActive = existingSession.currentGameData &&
+        existingSession.currentGameData.socket &&
+        existingSession.currentGameData.socket.connected;
+
+      console.log(`Connection state for ${username}: Game: ${gameActive}`);
+
+      // Check if player has any active game session
+      if (gameActive) {
+        console.log(`Player ${username} already has an active game`);
+        throw createHttpError(403, "You already have an active game session. Please finish your current game first");
+      }
 
       const platform = await Platform.aggregate([
         { $unwind: "$games" },
@@ -181,24 +203,26 @@ export class GameController {
       ]);
 
       const game = platform[0];
-      // Extract the main domain by removing any leading subdomain
-      const mainDomain = config.hosted_url_cors.replace(/^[^.]+\./, '');
-      const hostPattern = new RegExp(`(^|\\.)${mainDomain.replace('.', '\\.')}$`);
-      // Check if the game URL exists and matches the pattern
-
+      // URL security check for production environments
       if (config.env === 'development') {
-        if (game) {
-          res.status(200).json({ url: game.url });
-        } else {
-          console.log('Unauthorized request');
-          throw createHttpError(401, "Unauthorized request");
-        }
+        res.status(200).json({
+          url: game.url,
+          name: game.name || slug
+        });
       } else {
-        if (game && hostPattern.test(game.url)) {
-          res.status(200).json({ url: game.url });
+        // Extract the main domain by removing any leading subdomain
+        const mainDomain = config.hosted_url_cors.replace(/^[^.]+\./, '');
+        const hostPattern = new RegExp(`(^|\\.)${mainDomain.replace('.', '\\.')}$`);
+
+        // Validate URL against domain pattern
+        if (hostPattern.test(game.url)) {
+          res.status(200).json({
+            url: game.url,
+            name: game.name || slug
+          });
         } else {
-          console.log('Unauthorized request');
-          throw createHttpError(401, "Unauthorized request");
+          console.log(`Unauthorized game URL: ${game.url}`);
+          throw createHttpError(401, "Unauthorized game provider");
         }
       }
 
@@ -208,6 +232,7 @@ export class GameController {
       }
 
     } catch (error) {
+      console.error("Error fetching game by slug:", error);
       next(error);
     }
   }

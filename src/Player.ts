@@ -15,11 +15,14 @@ import { GameSession } from "./dashboard/session/gameSession";
 
 
 export interface currentGamedata {
-  gameId: string | null;
   username: string,
+  gameId: string | null;
   gameSettings: any;
   currentGameManager: GameManager;
   session: GameSession | null;
+  socket: Socket | null;
+  heartbeatInterval: NodeJS.Timeout;
+
   sendMessage: (action: string, message: any, isGameSocket: boolean) => void;
   sendError: (message: string, isGameSocket: boolean) => void;
   sendAlert: (message: string, isGameSocket: boolean) => void;
@@ -27,8 +30,6 @@ export interface currentGamedata {
   deductPlayerBalance: (message: number) => void;
   getPlayerData: () => playerData;
 }
-
-
 
 export interface playerData {
   username: string;
@@ -41,7 +42,6 @@ export interface playerData {
 
 export default class PlayerSocket {
   platformData: socketConnectionData;
-  gameData: socketConnectionData;
   currentGameData: currentGamedata;
 
   playerData: playerData;
@@ -93,22 +93,16 @@ export default class PlayerSocket {
 
     }
 
-    this.gameData = {
-      socket: null,
-      heartbeatInterval: setInterval(() => { }, 0),
-      reconnectionAttempts: 0,
-      maxReconnectionAttempts: 3,
-      reconnectionTimeout: 1000,
-      cleanedUp: false,
-    };
-
 
     this.currentGameData = {
-      gameId: null,
       username: this.playerData.username,
+      gameId: null,
       gameSettings: null,
       currentGameManager: null,
       session: null,
+      socket: null,
+      heartbeatInterval: setInterval(() => { }, 0),
+
       sendMessage: this.sendMessage.bind(this),
       sendError: this.sendError.bind(this),
       sendAlert: this.sendAlert.bind(this),
@@ -121,9 +115,8 @@ export default class PlayerSocket {
   }
 
 
-
   public async initializePlatformSocket(socket: Socket) {
-    if (this.gameData.socket) {
+    if (this.currentGameData.socket) {
       await this.cleanupGameSocket()
     }
 
@@ -148,20 +141,20 @@ export default class PlayerSocket {
 
   private initializeGameSocket(socket: Socket) {
 
-    if (this.gameData.socket) {
+    if (this.currentGameData.socket) {
       this.cleanupGameSocket();
     }
 
-    this.gameData.socket = socket;
+    this.currentGameData.socket = socket;
     this.currentGameData.gameId = socket.handshake.auth.gameId;
     sessionManager.startGameSession(this.playerData.username, this.currentGameData.gameId, this.playerData.credits)
 
-    this.gameData.socket.on("disconnect", () => this.handleGameDisconnection());
+    this.currentGameData.socket.on("disconnect", () => this.handleGameDisconnection());
     this.initGameData();
     this.startGameHeartbeat();
     this.onExit(true)
     this.messageHandler(true);
-    this.gameData.socket.emit("socketState", true);
+    this.currentGameData.socket.emit("socketState", true);
   }
 
   // Handle platform disconnection and reconnection
@@ -170,26 +163,29 @@ export default class PlayerSocket {
     this.attemptReconnection(this.platformData)
   }
 
-  // Handle game disconnection and reconnection
+  // Handle game disconnection - immediately clean up without reconnection attempts
   private handleGameDisconnection() {
     if (process.env.NODE_ENV == "testing") return;
-    this.attemptReconnection(this.gameData);
+    this.cleanupGameSocket();
   }
 
   // Cleanup only the game socket
   private async cleanupGameSocket() {
     await sessionManager.endGameSession(this.playerData.username, this.playerData.credits);
 
-    if (this.gameData.socket) {
-      this.gameData.socket.disconnect(true);
-      this.gameData.socket = null;
+    if (this.currentGameData.socket) {
+      this.currentGameData.socket.disconnect(true);
+      this.currentGameData.socket = null;
     }
-    clearInterval(this.gameData.heartbeatInterval);
 
+    clearInterval(this.currentGameData.heartbeatInterval);
+
+    // Nullify all game-related data
     this.currentGameData.currentGameManager = null;
     this.currentGameData.gameSettings = null;
     this.currentGameData.gameId = null;
-    this.gameData.reconnectionAttempts = 0;
+    this.currentGameData.session = null;
+    this.currentGameSession = null;
 
     if (process.env.NODE_ENV === "testing") {
       this.cleanupPlatformSocket()
@@ -249,7 +245,7 @@ export default class PlayerSocket {
       this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits } }, "platform");
 
       this.platformData.heartbeatInterval = setInterval(() => {
-        if (this.gameData.socket) {
+        if (this.currentGameData.socket) {
           this.sendAlert(`Currenlty Playing : ${this.currentGameData.gameId}`)
         }
         this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits } }, "platform");
@@ -259,9 +255,9 @@ export default class PlayerSocket {
 
   // Start heartbeat for game socket
   private startGameHeartbeat() {
-    if (this.gameData.socket) {
-      this.gameData.heartbeatInterval = setInterval(() => {
-        if (this.gameData.socket && this.currentGameData.gameId) {
+    if (this.currentGameData.socket) {
+      this.currentGameData.heartbeatInterval = setInterval(() => {
+        if (this.currentGameData.socket && this.currentGameData.gameId) {
           this.sendAlert(`${this.playerData.username} : ${this.currentGameData.gameId}`)
         }
       }, 20000)
@@ -303,7 +299,7 @@ export default class PlayerSocket {
   }
 
   private async initGameData() {
-    if (!this.gameData.socket) return;
+    if (!this.currentGameData.socket) return;
 
     try {
       const tagName = this.currentGameData.gameId;
@@ -336,7 +332,7 @@ export default class PlayerSocket {
   }
 
   public sendMessage(action: string, message: any, isGameSocket: boolean = false) {
-    const socket = isGameSocket ? this.gameData.socket : this.platformData.socket;
+    const socket = isGameSocket ? this.currentGameData.socket : this.platformData.socket;
     if (socket) {
       socket.emit(
         messageType.MESSAGE,
@@ -347,7 +343,7 @@ export default class PlayerSocket {
 
   public sendData(data: any, type: "platform" | "game"): void {
     try {
-      const socket = type === "platform" ? this.platformData.socket : this.gameData.socket;
+      const socket = type === "platform" ? this.platformData.socket : this.currentGameData.socket;
       if (socket) {
         socket.emit(messageType.DATA, data)
       }
@@ -359,7 +355,7 @@ export default class PlayerSocket {
 
   // Send an error message to the client (either platform or game)
   public sendError(message: string, isGameSocket: boolean = false) {
-    const socket = isGameSocket ? this.gameData.socket : this.platformData.socket;
+    const socket = isGameSocket ? this.currentGameData.socket : this.platformData.socket;
     if (socket) {
       socket.emit(messageType.ERROR, message)
     }
@@ -367,7 +363,7 @@ export default class PlayerSocket {
 
   // Send an alert to the client (platform or game)
   public sendAlert(message: string, isGameSocket: boolean = false) {
-    const socket = isGameSocket ? this.gameData.socket : this.platformData.socket;
+    const socket = isGameSocket ? this.currentGameData.socket : this.platformData.socket;
     if (socket) {
       socket.emit(messageType.ALERT, message)
     }
@@ -375,7 +371,7 @@ export default class PlayerSocket {
 
   // Handle client message communication for the game socket
   private messageHandler(isGameSocket: boolean = false) {
-    const socket = isGameSocket ? this.gameData.socket : this.platformData.socket;
+    const socket = isGameSocket ? this.currentGameData.socket : this.platformData.socket;
 
     if (socket) {
       socket.on("message", (message) => {
@@ -399,7 +395,7 @@ export default class PlayerSocket {
 
   // Handle user exit event for the game or platform
   public onExit(isGameSocket: boolean = false) {
-    const socket = isGameSocket ? this.gameData.socket : this.platformData.socket;
+    const socket = isGameSocket ? this.currentGameData.socket : this.platformData.socket;
     if (socket) {
       socket.on("EXIT", async () => {
         if (isGameSocket) {
