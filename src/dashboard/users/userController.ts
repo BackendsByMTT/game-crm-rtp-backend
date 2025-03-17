@@ -187,11 +187,11 @@ export class UserController {
 
       const socketUser = sessionManager.getPlayerPlatform(username);
 
-      if (socketUser?.platformData.socket?.connected || socketUser?.gameData.socket) {
+      if (socketUser?.platformData.socket?.connected || socketUser?.currentGameData.socket) {
         throw createHttpError(403, "Already logged in on another browser or tab.");
       }
 
-      if (socketUser?.gameData.socket) {
+      if (socketUser?.currentGameData.socket) {
         throw createHttpError(403, "You Are Already Playing on another browser or tab.");
       }
 

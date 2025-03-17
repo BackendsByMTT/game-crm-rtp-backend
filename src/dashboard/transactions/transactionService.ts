@@ -21,7 +21,7 @@ export class TransactionService {
 
     // Check if the client is currently in a game via socket connection
     const socketUser = sessionManager.getPlayerPlatform(client.username);
-    if (socketUser?.gameData.socket) {
+    if (socketUser?.currentGameData.socket) {
       throw createHttpError(403, "The client must exit their current game session before initiating a transaction.");
     }
 
