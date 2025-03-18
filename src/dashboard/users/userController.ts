@@ -10,14 +10,13 @@ import createHttpError from "http-errors";
 import jwt from "jsonwebtoken";
 import { config } from "../../config/config";
 import bcrypt from "bcrypt";
-import mongoose, { PipelineStage, Types } from "mongoose";
+import mongoose, { PipelineStage } from "mongoose";
 import { User, Player as PlayerModel, Player } from "./userModel";
 import UserService from "./userService";
 import Transaction from "../transactions/transactionModel";
-import { QueryParams } from "../../utils/globalTypes";
 import { IPlayer, IUser } from "./userType";
 import { sessionManager } from "../session/sessionManager";
-import { hasPermission, isAdmin, isSubordinate } from "../../utils/permissions";
+import { hasPermission, isAdmin } from "../../utils/permissions";
 
 interface ActivePlayer {
   username: string;
@@ -215,11 +214,16 @@ export class UserController {
         throw createHttpError(400, "Username is required");
       }
 
-      // Clear the user token cookie
-      res.clearCookie("userToken", {
-        httpOnly: true,
-        sameSite: "none",
-      });
+      const platformSession = sessionManager.getPlayerPlatform(username);
+      if (platformSession) {
+        await platformSession.cleanupPlatformSocket()
+      }
+
+      res.clearCookie("token");
+      res.clearCookie("AWSALBTG");
+      res.clearCookie("AWSALBTGCORS");
+      res.clearCookie("index");
+
 
       res.status(200).json({
         message: "Logout successful",

@@ -248,7 +248,7 @@ export default class PlayerSocket {
         if (this.currentGameData.socket) {
           this.sendAlert(`Currenlty Playing : ${this.currentGameData.gameId}`)
         }
-        this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits } }, "platform");
+        this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits, worker: process.pid } }, "platform");
       }, 5000)
     }
   }

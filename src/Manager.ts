@@ -55,7 +55,7 @@ export default class Manager {
                 if (this.socketData.socket) {
                     const activePlayers = await sessionManager.getPlayersSummariesByManager(this.username, this.role);
                     this.socketData.socket.emit("activePlayers", activePlayers);
-                    this.sendData({ type: "CREDITS", payload: { credits: this.credits, role: this.role } })
+                    this.sendData({ type: "CREDITS", payload: { credits: this.credits, role: this.role, worker: process.pid } })
                 }
             }, 5000),
             reconnectionAttempts: 0,

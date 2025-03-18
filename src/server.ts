@@ -6,7 +6,6 @@ import PlayerSocket from "./Player";
 import { Player as PlayerModel, User } from "./dashboard/users/userModel";
 import { IUser } from "./dashboard/users/userType";
 import { messageType } from "./game/Utils/gameUtils";
-import e from "cors";
 import Manager from "./Manager";
 
 const getPlayerDetails = async (username: string) => {
