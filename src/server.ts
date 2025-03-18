@@ -7,6 +7,10 @@ import { Player as PlayerModel, User } from "./dashboard/users/userModel";
 import { IUser } from "./dashboard/users/userType";
 import { messageType } from "./game/Utils/gameUtils";
 import Manager from "./Manager";
+import { createClient } from "redis";
+import { config } from "./config/config";
+import { createAdapter } from "@socket.io/redis-adapter";
+import { redisClient } from "./config/redis";
 
 const getPlayerDetails = async (username: string) => {
     const player = await PlayerModel.findOne({ username }).populate<{ createdBy: IUser }>("createdBy", "username");
@@ -29,9 +33,18 @@ const getManagerDetails = async (username: string) => {
 
 }
 
-export function setupWebSocket(server: any, corsOptions: any) {
+export async function setupWebSocket(server: any, corsOptions: any) {
     const io = new Server(server, { cors: corsOptions });
     io.use(socketAuth);
+
+    try {
+        await redisClient.connect();
+    } catch (error) {
+        console.error("❌ Redis connection error:", error);
+        process.exit(1);
+    }
+
+    io.adapter(createAdapter(redisClient.pubClient, redisClient.subClient));
 
     const namespaces = {
         playground: io.of("/playground"),
@@ -41,6 +54,7 @@ export function setupWebSocket(server: any, corsOptions: any) {
 
     Object.values(namespaces).forEach((ns) => ns.use(socketAuth));
 
+    console.log(`⚡ WebSocket server running on worker ${cluster.worker?.id}`);
 
     // **Playground Namespace (For Players)**
     namespaces.playground.on("connection", async (socket) => {
@@ -116,8 +130,6 @@ export function setupWebSocket(server: any, corsOptions: any) {
         }
 
     });
-
-    console.log(`⚡ WebSocket server running on worker ${cluster.worker?.id}`);
 }
 
 function disconnectWithError(socket: any, message: string) {

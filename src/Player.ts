@@ -11,7 +11,7 @@ import createHttpError from "http-errors";
 import { socketConnectionData } from "./utils/utils";
 import { sessionManager } from "./dashboard/session/sessionManager";
 import { GameSession } from "./dashboard/session/gameSession";
-
+import { redisClient } from "./config/redis";
 
 
 export interface currentGamedata {
@@ -53,17 +53,7 @@ export default class PlayerSocket {
   currentGameSession: GameSession | null = null;
 
 
-  constructor(
-    username: string,
-    role: string,
-    status: string,
-    credits: number,
-    userAgent: string,
-    socket: Socket,
-    managerName: string
-  ) {
-
-
+  constructor(username: string, role: string, status: string, credits: number, userAgent: string, socket: Socket, managerName: string) {
     const existing = sessionManager.getPlayerPlatform(username);
     if (existing && existing.platformData.socket.id !== socket.id) {
       existing.initializePlatformSocket(socket);
@@ -71,11 +61,7 @@ export default class PlayerSocket {
     }
 
     this.playerData = {
-      username,
-      role,
-      credits,
-      userAgent,
-      status
+      username, role, credits, userAgent, status
     };
 
     this.entryTime = new Date();
@@ -92,7 +78,6 @@ export default class PlayerSocket {
       platformId: socket.handshake.auth.platformId
 
     }
-
 
     this.currentGameData = {
       username: this.playerData.username,
@@ -112,34 +97,66 @@ export default class PlayerSocket {
     };
 
     this.initializePlatformSocket(socket);
+    this.subscribeToRedisEvents();
+  }
+
+  private subscribeToRedisEvents() {
+    redisClient.subClient.subscribe(`player:${this.playerData.username}`, (message) => {
+      const data = JSON.parse(message);
+      console.log(`🔄 Syncing player state for ${this.playerData.username}:`, data);
+
+      switch (data.type) {
+        case "UPDATE_BALANCE":
+          this.playerData.credits = data.payload.credits;
+          this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits } }, "platform");
+          break;
+
+        default:
+          console.log(`Unknown message type: ${data.type}`);
+      }
+    })
   }
 
 
   public async initializePlatformSocket(socket: Socket) {
-    if (this.currentGameData.socket) {
-      await this.cleanupGameSocket()
+    try {
+      if (this.currentGameData.socket) {
+        await this.cleanupGameSocket()
+      }
+
+      await sessionManager.startPlatformSession(this)
+      this.platformData.socket = socket;
+      this.platformData.platformId = socket.handshake.auth.platformId;
+
+      this.messageHandler(false);
+      this.startPlatformHeartbeat();
+      this.onExit();
+
+      if (this.platformData.socket) {
+        this.platformData.socket.on("disconnect", () => {
+          this.handlePlatformDisconnection()
+        })
+      } else {
+        console.error("Socket is null during initialization of disconnect event");
+      }
+
+      await redisClient.pubClient.hSet(
+        `playground:${this.playerData.username}`,
+        {
+          "platformId": this.platformData.platformId || "none",
+          "userAgent": this.playerData.userAgent || "unknown",
+          "currentGame": this.currentGameData.gameId || "none"
+        }
+      );
+
+      this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits } }, "platform");
+
+    } catch (error) {
+      console.error("Error initializing platform socket:", error);
     }
-
-    await sessionManager.startPlatformSession(this)
-    this.platformData.socket = socket;
-    this.platformData.platformId = socket.handshake.auth.platformId;
-    this.messageHandler(false);
-    this.startPlatformHeartbeat();
-    this.onExit();
-
-
-    if (this.platformData.socket) {
-      this.platformData.socket.on("disconnect", () => {
-        this.handlePlatformDisconnection()
-      })
-    } else {
-      console.error("Socket is null during initialization of disconnect event");
-    }
-
-    this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits } }, "platform");
   }
 
-  private initializeGameSocket(socket: Socket) {
+  private async initializeGameSocket(socket: Socket) {
 
     if (this.currentGameData.socket) {
       this.cleanupGameSocket();
@@ -147,6 +164,13 @@ export default class PlayerSocket {
 
     this.currentGameData.socket = socket;
     this.currentGameData.gameId = socket.handshake.auth.gameId;
+
+    await redisClient.pubClient.hSet(
+      `playground:${this.playerData.username}`,
+      {
+        "currentGame": this.currentGameData.gameId || "none"
+      }
+    )
     sessionManager.startGameSession(this.playerData.username, this.currentGameData.gameId, this.playerData.credits)
 
     this.currentGameData.socket.on("disconnect", () => this.handleGameDisconnection());
@@ -173,6 +197,13 @@ export default class PlayerSocket {
   private async cleanupGameSocket() {
     await sessionManager.endGameSession(this.playerData.username, this.playerData.credits);
 
+    await redisClient.pubClient.hSet(
+      `playground:${this.playerData.username}`,
+      {
+        "currentGame": "none"
+      }
+    )
+
     if (this.currentGameData.socket) {
       this.currentGameData.socket.disconnect(true);
       this.currentGameData.socket = null;
@@ -194,8 +225,8 @@ export default class PlayerSocket {
 
   // Cleanup only the platform socket
   public async cleanupPlatformSocket() {
-    await sessionManager.endPlatformSession(this.playerData.username);
 
+    await sessionManager.endPlatformSession(this.playerData.username);
 
     if (this.platformData.socket) {
       this.platformData.platformId = null;
@@ -206,6 +237,8 @@ export default class PlayerSocket {
     clearInterval(this.platformData.heartbeatInterval);
     this.platformData.reconnectionAttempts = 0;
     this.platformData.cleanedUp = true;
+
+    await redisClient.pubClient.del(`playground:${this.playerData.username}`);
   }
 
   // Attempt reconnection  for platform or game socket based on provided data

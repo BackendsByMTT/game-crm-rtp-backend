@@ -2,6 +2,7 @@ import { Socket } from "socket.io";
 import { Player } from "./dashboard/users/userModel";
 import { sessionManager } from "./dashboard/session/sessionManager";
 import { PlatformSessionModel } from "./dashboard/session/sessionModel";
+import { redisClient } from "./config/redis";
 
 
 export interface socketConnectionData {
@@ -13,7 +14,6 @@ export interface socketConnectionData {
     cleanedUp: boolean;
 }
 
-//
 export default class Manager {
     username: string;
     credits: number;
@@ -27,6 +27,24 @@ export default class Manager {
         this.role = role;
         this.userAgent = userAgent;
         this.initializeManager(socket);
+        this.subscribeToRedisEvents();
+    }
+
+    private subscribeToRedisEvents() {
+        redisClient.subClient.subscribe(`control:${this.role}:${this.username}`, (message) => {
+            const data = JSON.parse(message);
+            console.log(`🔄 Syncing state for ${this.username}:`, data);
+
+            switch (data.type) {
+                case "UPDATE_BALANCE":
+                    this.credits = data.payload.credits;
+                    this.sendData({ type: "CREDIT", data: { credits: this.credits } });
+                    break;
+
+                default:
+                    console.log(`Unknown message type: ${data.type}`);
+            }
+        })
     }
 
     private resetSocketData() {
