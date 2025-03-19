@@ -76,7 +76,7 @@ export class SLFM {
     public async spinResult(): Promise<void> {
         try {
             const playerData = this.getPlayerData();
-            const platformSession = sessionManager.getPlayerPlatform(playerData.username);
+            const platformSession = await sessionManager.getPlaygroundSession(playerData.username);
 
             if (this.settings.currentBet > playerData.credits) {
                 console.log(this.settings.currentBet + playerData.credits)
@@ -85,14 +85,14 @@ export class SLFM {
             }
             if (!this.settings.freeSpin.useFreeSpin) {
                 await this.deductPlayerBalance(this.settings.currentBet);
-                
+
                 // Ensure the totalbet is limited to 4 decimal places
                 this.playerData.totalbet = parseFloat(
                     (this.playerData.totalbet + this.settings.currentBet).toFixed(4)
                 );
-            
+
             }
-            
+
 
             const spinId = platformSession.currentGameSession.createSpin();
             platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);

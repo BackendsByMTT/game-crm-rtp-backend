@@ -1,8 +1,8 @@
 import { v4 as uuidv4 } from "uuid";
 import { EventEmitter } from "events";
 import { ISpecialFeatures, ISpinData } from "./sessionTypes";
-import mongoose from "mongoose";
 import { Platform } from "../games/gameModel";
+import { NewEventType } from "../../utils/eventTypes";
 
 export class GameSession extends EventEmitter {
     playerId: string;
@@ -86,17 +86,10 @@ export class GameSession extends EventEmitter {
                 spin[field] = value;
         }
 
-        this.emit("spinUpdated", this.getSummary());
+        this.emit(NewEventType.UPDATE_SPIN, this.getSummary());
         return true;
     }
 
-    public endSession(creditsAtExit: number) {
-        this.exitTime = new Date();
-        this.creditsAtExit = creditsAtExit;
-        this.sessionDuration = (this.exitTime.getTime() - this.entryTime.getTime()) / 1000;
-
-        this.emit("sessionEnded", this.getSummary());
-    }
 
     public getSummary() {
         return {

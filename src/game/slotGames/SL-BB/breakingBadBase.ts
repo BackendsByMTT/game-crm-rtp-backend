@@ -75,7 +75,7 @@ export class SLBB {
   public async spinResult(): Promise<void> {
     try {
       const playerData = this.getPlayerData();
-      const platformSession = sessionManager.getPlayerPlatform(playerData.username);
+      const platformSession = await sessionManager.getPlaygroundSession(playerData.username);
 
 
       const { freeSpin, bonus } = this.settings

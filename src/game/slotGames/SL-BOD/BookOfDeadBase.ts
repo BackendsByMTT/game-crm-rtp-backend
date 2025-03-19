@@ -72,7 +72,7 @@ export class SLBOD {
         break;
 
       case "GAMBLERESULT":
-        let result = getGambleResult({ selected: response.cardType  });
+        let result = getGambleResult({ selected: response.cardType });
         //calculate payout
         switch (result.playerWon) {
           case true:
@@ -114,7 +114,7 @@ export class SLBOD {
   public async spinResult(): Promise<void> {
     try {
       const playerData = this.getPlayerData();
-      const platformSession = sessionManager.getPlayerPlatform(playerData.username);
+      const platformSession = await sessionManager.getPlaygroundSession(playerData.username);
 
       if (this.settings.currentBet > playerData.credits) {
         this.sendError("Low Balance");
@@ -125,14 +125,14 @@ export class SLBOD {
       if (!(this.settings.freeSpinCount > 0)) {
 
         this.deductPlayerBalance(currentBet);
-        this.playerData.totalbet =precisionRound(this.playerData.totalbet + currentBet, 5);
+        this.playerData.totalbet = precisionRound(this.playerData.totalbet + currentBet, 5);
       }
 
 
       const spinId = platformSession.currentGameSession.createSpin();
       platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
 
-       new RandomResultGenerator(this);
+      new RandomResultGenerator(this);
       checkForWin(this)
       const winAmount = this.playerData.currentWining;
       platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', winAmount);

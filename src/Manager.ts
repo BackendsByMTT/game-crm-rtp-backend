@@ -2,6 +2,8 @@ import { Socket } from "socket.io";
 import { Player } from "./dashboard/users/userModel";
 import { sessionManager } from "./dashboard/session/sessionManager";
 import { PlatformSessionModel } from "./dashboard/session/sessionModel";
+import { redisClient } from "./config/redis";
+import { NewEventType } from "./utils/eventTypes";
 
 
 export interface socketConnectionData {
@@ -13,7 +15,6 @@ export interface socketConnectionData {
     cleanedUp: boolean;
 }
 
-//
 export default class Manager {
     username: string;
     credits: number;
@@ -27,6 +28,45 @@ export default class Manager {
         this.role = role;
         this.userAgent = userAgent;
         this.initializeManager(socket);
+        this.subscribeToRedisEvents();
+    }
+
+
+    private subscribeToRedisEvents() {
+        redisClient.subClient.subscribe(`control:${this.role}:${this.username}`, (message) => {
+            const data = JSON.parse(message);
+            console.log(`🔄 Syncing state for ${this.username}:`, data);
+
+            switch (data.type) {
+                case "UPDATE_BALANCE":
+                    this.credits = data.payload.credits;
+                    this.sendData({ type: "CREDIT", data: { credits: this.credits } });
+                    break;
+
+                case NewEventType.PLAYGROUND_JOINED:
+                    this.socketData.socket.emit("PLATFORM", { type: "ENTERED_PLATFORM", payload: data.payload });
+                    break;
+
+                case NewEventType.PLAYGROUND_EXITED:
+                    this.socketData.socket.emit("PLATFORM", { type: "EXITED_PLATFORM", payload: data.payload });
+                    break
+
+                case NewEventType.GAME_STARTED:
+                    this.socketData.socket.emit("PLATFORM", { type: "ENTERED_GAME", payload: data.payload });
+                    break;
+
+                case NewEventType.GAME_ENDED:
+                    this.socketData.socket.emit("PLATFORM", { type: "EXITED_GAME", payload: data.payload });
+                    break;
+
+                case NewEventType.UPDATE_SPIN:
+                    this.socketData.socket.emit("PLATFORM", { type: "UPDATE_SPIN", payload: data.payload });
+                    break;
+
+                default:
+                    console.log(`Unknown message type: ${data.type}`);
+            }
+        })
     }
 
     private resetSocketData() {
@@ -46,18 +86,23 @@ export default class Manager {
     }
 
 
-    public initializeManager(socket: Socket) {
+    public async initializeManager(socket: Socket) {
         this.resetSocketData();
 
         this.socketData = {
             socket: socket,
             heartbeatInterval: setInterval(async () => {
                 if (this.socketData.socket) {
-                    const activePlayers = await sessionManager.getPlayersSummariesByManager(this.username, this.role);
-                    this.socketData.socket.emit("activePlayers", activePlayers);
-                    this.sendData({ type: "CREDITS", payload: { credits: this.credits, role: this.role } })
+                    // Fetch all players from Redis and send to the manager
+                    const allActivePlayers = await this.getAllPlaygroundPlayers();
+                    this.socketData.socket.emit(NewEventType.ALL_PLAYGROUND_PLAYERS, allActivePlayers);
+
+                    this.sendData({
+                        type: "CREDITS",
+                        payload: { credits: this.credits, role: this.role, worker: process.pid }
+                    });
                 }
-            }, 5000),
+            }, 5000), // Updates every 5 seconds
             reconnectionAttempts: 0,
             maxReconnectionAttempts: 3,
             reconnectionTimeout: null,
@@ -70,16 +115,19 @@ export default class Manager {
             console.log(`Manager ${this.username} disconnected`);
             this.handleDisconnection();
         });
+
+        await sessionManager.addControlUser(this);
         this.sendData({ type: "CREDITS", payload: { credits: this.credits, role: this.role } })
     }
 
-    private handleDisconnection() {
+    private async handleDisconnection() {
+
         clearInterval(this.socketData.heartbeatInterval); // Clear heartbeat on disconnect
         this.socketData.socket = null;
 
-        this.socketData.reconnectionTimeout = setTimeout(() => {
+        this.socketData.reconnectionTimeout = setTimeout(async () => {
             console.log(`Removing manager ${this.username} due to prolonged disconnection`);
-            sessionManager.deleteManagerByUsername(this.username)
+            await sessionManager.removeControlUser(this.username);
         }, 60000); // 1-minute timeout for reconnection
     }
 
@@ -145,7 +193,7 @@ export default class Manager {
             }
 
             // Notify the player socket of the status change
-            const playerSocket = sessionManager.getPlayerPlatform(data.playerId)
+            const playerSocket = await sessionManager.getPlaygroundSession(data.playerId)
 
             if (playerSocket) {
                 if (data.status === "inactive") {
@@ -182,6 +230,40 @@ export default class Manager {
         } catch (error) {
             console.error("Error retrieving player session data:", error);
             if (callback) callback({ success: false, message: "Error retrieving session data" });
+        }
+    }
+
+    private async getAllPlaygroundPlayers(): Promise<any[]> {
+        try {
+            const allPlayers: any[] = [];
+            const playgroundKeys = await redisClient.pubClient.keys("playground:*");
+
+            for (const playerKey of playgroundKeys) {
+                const playerData = await redisClient.pubClient.hGetAll(playerKey);
+
+                // Ensure playerData exists
+                if (Object.keys(playerData).length === 0) continue;
+
+                allPlayers.push({
+                    username: playerData.playerId,
+                    status: playerData.status,
+                    currentCredits: playerData.currentCredits ? parseFloat(playerData.currentCredits) : 0,
+                    platformId: playerData.platformId || null,
+                    managerName: playerData.managerName || null,
+                    entryTime: playerData.entryTime ? new Date(playerData.entryTime) : null,
+                    exitTime: playerData.exitTime && playerData.exitTime !== "null" ? new Date(playerData.exitTime) : null,
+                    currentRTP: playerData.currentRTP ? parseFloat(playerData.currentRTP) : 0,
+                    currentGame: playerData.currentGame && playerData.currentGame !== "null"
+                        ? JSON.parse(playerData.currentGame)
+                        : null,
+                    userAgent: playerData.userAgent || "Unknown",
+                });
+            }
+
+            return allPlayers;
+        } catch (error) {
+            console.error("❌ Error fetching all playground players from Redis:", error);
+            return [];
         }
     }
 
