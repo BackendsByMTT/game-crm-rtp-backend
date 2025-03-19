@@ -64,7 +64,7 @@ export class SLFLC {
         this.getRTP(response.data.spins || 1);
         break;
       case "FREESPINOPTION":
-        if (response.data.option>-1) {
+        if (response.data.option > -1) {
           console.log(response.data.option, "freespin option ")
 
           if (response.data.option >= this.settings.freespin.options.length ||
@@ -95,7 +95,7 @@ export class SLFLC {
   public async spinResult(): Promise<void> {
     try {
       const playerData = this.getPlayerData();
-      const platformSession = sessionManager.getPlayerPlatform(playerData.username);
+      const platformSession = await sessionManager.getPlaygroundSession(playerData.username);
 
       if (this.settings.currentBet > playerData.credits) {
         this.sendError("Low Balance");

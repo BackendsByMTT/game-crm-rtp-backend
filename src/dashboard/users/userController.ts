@@ -10,14 +10,13 @@ import createHttpError from "http-errors";
 import jwt from "jsonwebtoken";
 import { config } from "../../config/config";
 import bcrypt from "bcrypt";
-import mongoose, { PipelineStage, Types } from "mongoose";
+import mongoose, { PipelineStage } from "mongoose";
 import { User, Player as PlayerModel, Player } from "./userModel";
 import UserService from "./userService";
 import Transaction from "../transactions/transactionModel";
-import { QueryParams } from "../../utils/globalTypes";
 import { IPlayer, IUser } from "./userType";
 import { sessionManager } from "../session/sessionManager";
-import { hasPermission, isAdmin, isSubordinate } from "../../utils/permissions";
+import { hasPermission, isAdmin } from "../../utils/permissions";
 
 interface ActivePlayer {
   username: string;
@@ -185,7 +184,7 @@ export class UserController {
       // });
 
 
-      const socketUser = sessionManager.getPlayerPlatform(username);
+      const socketUser = await sessionManager.getPlaygroundSession(username);
 
       if (socketUser?.platformData.socket?.connected || socketUser?.currentGameData.socket) {
         throw createHttpError(403, "Already logged in on another browser or tab.");
@@ -215,11 +214,17 @@ export class UserController {
         throw createHttpError(400, "Username is required");
       }
 
-      // Clear the user token cookie
-      res.clearCookie("userToken", {
-        httpOnly: true,
-        sameSite: "none",
-      });
+      // TODO: we have to change this according to redis
+      const platformSession = await sessionManager.getPlaygroundSession(username);
+      if (platformSession) {
+        await platformSession.cleanupPlatformSocket()
+      }
+
+      res.clearCookie("token");
+      res.clearCookie("AWSALBTG");
+      res.clearCookie("AWSALBTGCORS");
+      res.clearCookie("index");
+
 
       res.status(200).json({
         message: "Logout successful",
@@ -531,10 +536,7 @@ export class UserController {
 
   async getAllPlayers(req: Request, res: Response, next: NextFunction) {
     try {
-      const activePlayers = new Set();
-      sessionManager.getPlatformSessions().forEach((value, key) => {
-        activePlayers.add({ username: key, currentGame: value.currentGameData.gameId });
-      });
+
 
       const _req = req as AuthRequest;
       const { username: currentUsername, role: currentUserRole } = _req.user;
@@ -577,7 +579,7 @@ export class UserController {
       }
 
       let query: any = {
-        username: { $in: Array.from(activePlayers).map((player: ActivePlayer) => player.username) },
+
       };
 
       // Handle date range filtering
@@ -673,20 +675,12 @@ export class UserController {
 
       const players = await PlayerModel.find(query).skip(skip).limit(limit);
 
-      const playersWithGameInfo = players.map(player => {
-        const activePlayer = Array.from(activePlayers).find((ap: ActivePlayer) => ap.username === player.username) as ActivePlayer | undefined;
-
-        return {
-          ...player.toObject(),
-          currentGame: activePlayer?.currentGame || 'inactive',
-        };
-      });
 
       res.status(200).json({
         totalSubordinates: playerCount,
         totalPages,
         currentPage: page,
-        subordinates: playersWithGameInfo,
+        subordinates: [],
       });
     } catch (error) {
       next(error);

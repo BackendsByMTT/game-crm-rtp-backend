@@ -1,5 +1,5 @@
 
-import mongoose, { Document, ObjectId, Types, mongo } from "mongoose";
+import mongoose, { Document, Model, ObjectId, Types, mongo } from "mongoose";
 
 export interface IUser extends Document {
   name: string;
@@ -35,4 +35,8 @@ export interface IPlayer extends Document {
   createdAt: Date;
   updatedAt: Date;
   createdBy: ObjectId | IUser; // It can either be an ObjectId or a populated IUser
+}
+
+export interface IPlayerModel extends Model<IPlayer> {
+  getHierarchyUsers(username: string): Promise<IUser[]>;
 }

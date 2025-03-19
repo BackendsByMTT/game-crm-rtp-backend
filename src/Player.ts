@@ -11,7 +11,8 @@ import createHttpError from "http-errors";
 import { socketConnectionData } from "./utils/utils";
 import { sessionManager } from "./dashboard/session/sessionManager";
 import { GameSession } from "./dashboard/session/gameSession";
-
+import { redisClient } from "./config/redis";
+import { NewEventType } from "./utils/eventTypes";
 
 
 export interface currentGamedata {
@@ -53,29 +54,10 @@ export default class PlayerSocket {
   currentGameSession: GameSession | null = null;
 
 
-  constructor(
-    username: string,
-    role: string,
-    status: string,
-    credits: number,
-    userAgent: string,
-    socket: Socket,
-    managerName: string
-  ) {
-
-
-    const existing = sessionManager.getPlayerPlatform(username);
-    if (existing && existing.platformData.socket.id !== socket.id) {
-      existing.initializePlatformSocket(socket);
-      return;
-    }
+  constructor(username: string, role: string, status: string, credits: number, userAgent: string, socket: Socket, managerName: string) {
 
     this.playerData = {
-      username,
-      role,
-      credits,
-      userAgent,
-      status
+      username, role, credits, userAgent, status
     };
 
     this.entryTime = new Date();
@@ -92,7 +74,6 @@ export default class PlayerSocket {
       platformId: socket.handshake.auth.platformId
 
     }
-
 
     this.currentGameData = {
       username: this.playerData.username,
@@ -112,34 +93,67 @@ export default class PlayerSocket {
     };
 
     this.initializePlatformSocket(socket);
+    this.subscribeToRedisEvents();
+  }
+
+  private subscribeToRedisEvents() {
+    redisClient.subClient.subscribe(`player:${this.playerData.username}`, (message) => {
+      const data = JSON.parse(message);
+      console.log(`🔄 Syncing player state for ${this.playerData.username}:`, data);
+
+      switch (data.type) {
+        case "UPDATE_BALANCE":
+          this.playerData.credits = data.payload.credits;
+          this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits } }, "platform");
+          break;
+
+        case NewEventType.UPDATE_PAYOUT:
+          if (this.currentGameData.gameId === data.payload.tagName) {
+            console.log(`🎮 Updating game settings for ${this.playerData.username}`);
+
+            // Update game settings dynamically
+            this.currentGameData.gameSettings = data.payload.payoutData;
+            this.currentGameData.currentGameManager.currentGameType.currentGame.initialize(data.payload.payoutData);
+
+            this.sendAlert(`Game ${data.payload.tagName} updated to version ${data.payload.newVersion}`, true);
+          }
+
+
+
+        default:
+          console.log(`Unknown message type: ${data.type}`);
+      }
+    })
   }
 
 
   public async initializePlatformSocket(socket: Socket) {
-    if (this.currentGameData.socket) {
-      await this.cleanupGameSocket()
+    try {
+      if (this.currentGameData.socket) {
+        await this.cleanupGameSocket()
+      }
+
+      this.platformData.socket = socket;
+      this.platformData.platformId = socket.handshake.auth.platformId;
+
+      this.messageHandler(false);
+      this.onExit();
+
+      if (this.platformData.socket) {
+        this.platformData.socket.on("disconnect", () => {
+          this.handlePlatformDisconnection()
+        })
+      } else {
+        console.error("Socket is null during initialization of disconnect event");
+      }
+
+      await sessionManager.startSession(this);
+    } catch (error) {
+      console.error("Error initializing platform socket:", error);
     }
-
-    await sessionManager.startPlatformSession(this)
-    this.platformData.socket = socket;
-    this.platformData.platformId = socket.handshake.auth.platformId;
-    this.messageHandler(false);
-    this.startPlatformHeartbeat();
-    this.onExit();
-
-
-    if (this.platformData.socket) {
-      this.platformData.socket.on("disconnect", () => {
-        this.handlePlatformDisconnection()
-      })
-    } else {
-      console.error("Socket is null during initialization of disconnect event");
-    }
-
-    this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits } }, "platform");
   }
 
-  private initializeGameSocket(socket: Socket) {
+  private async initializeGameSocket(socket: Socket) {
 
     if (this.currentGameData.socket) {
       this.cleanupGameSocket();
@@ -147,14 +161,14 @@ export default class PlayerSocket {
 
     this.currentGameData.socket = socket;
     this.currentGameData.gameId = socket.handshake.auth.gameId;
-    sessionManager.startGameSession(this.playerData.username, this.currentGameData.gameId, this.playerData.credits)
-
     this.currentGameData.socket.on("disconnect", () => this.handleGameDisconnection());
     this.initGameData();
     this.startGameHeartbeat();
     this.onExit(true)
     this.messageHandler(true);
     this.currentGameData.socket.emit("socketState", true);
+
+    await sessionManager.startGame(this);
   }
 
   // Handle platform disconnection and reconnection
@@ -171,41 +185,30 @@ export default class PlayerSocket {
 
   // Cleanup only the game socket
   private async cleanupGameSocket() {
-    await sessionManager.endGameSession(this.playerData.username, this.playerData.credits);
-
-    if (this.currentGameData.socket) {
-      this.currentGameData.socket.disconnect(true);
-      this.currentGameData.socket = null;
-    }
-
-    clearInterval(this.currentGameData.heartbeatInterval);
-
-    // Nullify all game-related data
-    this.currentGameData.currentGameManager = null;
-    this.currentGameData.gameSettings = null;
-    this.currentGameData.gameId = null;
-    this.currentGameData.session = null;
-    this.currentGameSession = null;
-
-    if (process.env.NODE_ENV === "testing") {
-      this.cleanupPlatformSocket()
+    try {
+      await sessionManager.endGame(this);
+    } catch (error) {
+      console.error(`❌ Error cleaning up game session for ${this.playerData.username}:`, error);
     }
   }
 
-  // Cleanup only the platform socket
   public async cleanupPlatformSocket() {
-    await sessionManager.endPlatformSession(this.playerData.username);
+    try {
+      await sessionManager.endSession(this);
 
+      if (this.platformData.socket) {
+        this.platformData.platformId = null;
+        this.platformData.socket.disconnect(true);
+        this.platformData.socket = null;
+      }
 
-    if (this.platformData.socket) {
-      this.platformData.platformId = null;
-      this.platformData.socket.disconnect(true);
-      this.platformData.socket = null;
+      clearInterval(this.platformData.heartbeatInterval);
+      this.platformData.reconnectionAttempts = 0;
+      this.platformData.cleanedUp = true;
+
+    } catch (error) {
+      console.error("Error cleaning up platform socket:")
     }
-
-    clearInterval(this.platformData.heartbeatInterval);
-    this.platformData.reconnectionAttempts = 0;
-    this.platformData.cleanedUp = true;
   }
 
   // Attempt reconnection  for platform or game socket based on provided data
@@ -239,20 +242,6 @@ export default class PlayerSocket {
   }
 
 
-  // Start heartbeat for platform socket
-  private startPlatformHeartbeat() {
-    if (this.platformData.socket) {
-      this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits } }, "platform");
-
-      this.platformData.heartbeatInterval = setInterval(() => {
-        if (this.currentGameData.socket) {
-          this.sendAlert(`Currenlty Playing : ${this.currentGameData.gameId}`)
-        }
-        this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits } }, "platform");
-      }, 5000)
-    }
-  }
-
   // Start heartbeat for game socket
   private startGameHeartbeat() {
     if (this.currentGameData.socket) {
@@ -271,10 +260,12 @@ export default class PlayerSocket {
       socket.disconnect(true);
       throw createHttpError(403, "Platform connection required before joining a game.");
     }
+    const MOBILE_USER_AGENT_REGEX = /android|iphone|ipad|ipod|mobile|okhttp/i;
+    const isMobile = this.playerData.userAgent ? MOBILE_USER_AGENT_REGEX.test(this.playerData.userAgent) : false;
 
     // Skip user-agent validation in the testing environment
     if (process.env.NODE_ENV !== "testing") {
-      if (socket.request.headers["user-agent"] !== this.playerData.userAgent) {
+      if (!isMobile && (socket.request.headers["user-agent"] !== this.playerData.userAgent)) {
         socket.emit("alert", {
           id: "AnotherDevice",
           message: "You are already playing on another browser",
@@ -475,7 +466,8 @@ export default class PlayerSocket {
       exitTime: this.exitTime,
       currentRTP: this.currentRTP,
       currentGame: this.currentGameSession?.getSummary() || null,
-      userAgent: this.playerData.userAgent
+      userAgent: this.playerData.userAgent,
+      platformId: this.platformData.platformId
     }
   }
 

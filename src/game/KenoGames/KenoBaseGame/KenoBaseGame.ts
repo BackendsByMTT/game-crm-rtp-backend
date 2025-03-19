@@ -134,7 +134,7 @@ export default class KenoBaseGame implements RequiredSocketMethods {
       }
       console.log(response.join('\n'));
       // writeMultipleArraysToCSV("hitFreqKeno.csv", hitsLength);
-      
+
       // // testing gen paytable
       // generatePaytableJSON(80, 20, 10, 85, examplePayoutMultiplier, "paytable.json");
     } catch (error) {
@@ -148,7 +148,7 @@ export default class KenoBaseGame implements RequiredSocketMethods {
   public async spinResult(): Promise<void> {
     try {
       const playerData = this.getPlayerData();
-      const platformSession = sessionManager.getPlayerPlatform(playerData.username);
+      const platformSession = await sessionManager.getPlaygroundSession(playerData.username);
 
       if (this.settings.currentBet > playerData.credits) {
         this.sendError("Low Balance");

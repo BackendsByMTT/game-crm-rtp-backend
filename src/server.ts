@@ -6,8 +6,9 @@ import PlayerSocket from "./Player";
 import { Player as PlayerModel, User } from "./dashboard/users/userModel";
 import { IUser } from "./dashboard/users/userType";
 import { messageType } from "./game/Utils/gameUtils";
-import e from "cors";
 import Manager from "./Manager";
+import { createAdapter } from "@socket.io/redis-adapter";
+import { redisClient } from "./config/redis";
 
 const getPlayerDetails = async (username: string) => {
     const player = await PlayerModel.findOne({ username }).populate<{ createdBy: IUser }>("createdBy", "username");
@@ -30,9 +31,18 @@ const getManagerDetails = async (username: string) => {
 
 }
 
-export function setupWebSocket(server: any, corsOptions: any) {
+export async function setupWebSocket(server: any, corsOptions: any) {
     const io = new Server(server, { cors: corsOptions });
     io.use(socketAuth);
+
+    try {
+        await redisClient.connect();
+    } catch (error) {
+        console.error("❌ Redis connection error:", error);
+        process.exit(1);
+    }
+
+    io.adapter(createAdapter(redisClient.pubClient, redisClient.subClient));
 
     const namespaces = {
         playground: io.of("/playground"),
@@ -42,6 +52,7 @@ export function setupWebSocket(server: any, corsOptions: any) {
 
     Object.values(namespaces).forEach((ns) => ns.use(socketAuth));
 
+    console.log(`⚡ WebSocket server running on worker ${cluster.worker?.id}`);
 
     // **Playground Namespace (For Players)**
     namespaces.playground.on("connection", async (socket) => {
@@ -53,7 +64,7 @@ export function setupWebSocket(server: any, corsOptions: any) {
 
         if (!playgroundId) return disconnectWithError(socket, "No playgroundId provided");
 
-        let existingSession = sessionManager.getPlayerPlatform(username);
+        let existingSession = await sessionManager.getPlaygroundSession(username);
         if (existingSession?.platformData?.socket.connected) {
             if (existingSession.platformData.platformId === playgroundId) {
                 return disconnectWithError(socket, "Already connected in playground");
@@ -80,45 +91,66 @@ export function setupWebSocket(server: any, corsOptions: any) {
 
     // **Game Namespace (For Players)**
     namespaces.game.on("connection", async (socket) => {
-        const { username, role, userAgent } = socket.data.user;
-        const gameId = socket.handshake.auth.gameId;
-        if (role !== "player") return socket.disconnect();
+        try {
+            const { username, role, userAgent } = socket.data.user;
+            const gameId = socket.handshake.auth.gameId;
+            if (role !== "player") return socket.disconnect();
 
-        console.log(`🎰 Player ${username} is attempting to enter the Arena`);
-        let existingSession = sessionManager.getPlayerPlatform(username);
-        // Check if player has an active playground session
-        if (!existingSession || !existingSession.platformData?.socket.connected) {
-            return disconnectWithError(socket, "You must be connected to a Playground first.");
-        }
+            console.log(`🎰 Player ${username} is attempting to enter the Arena`);
 
-        // Always treat `updateGameSocket` as the first game session entry
-        console.log(`🎰 Player ${username} entering game, updating socket session`);
-        await existingSession.updateGameSocket(socket);
-        existingSession.sendAlert(`🎰 Welcome to the Arena : ${existingSession.currentGameData.gameId}`);
-    });
-
-    // **Control Namespace (For Admins and Moderators)**
-    namespaces.control.on("connection", async (socket) => {
-        const { username, role } = socket.data.user;
-        const { credits } = await getManagerDetails(username);
-        const userAgent = socket.handshake.headers["user-agent"];
-
-        let existingManager = sessionManager.getActiveManagerByUsername(username);
-        if (existingManager) {
-            if (existingManager.socketData.reconnectionTimeout) {
-                clearTimeout(existingManager.socketData.reconnectionTimeout);
+            // Validate Redis Session
+            const playgroundSession = await redisClient.pubClient.hGetAll(`playground:${username}`);
+            if (!playgroundSession || Object.keys(playgroundSession).length === 0) {
+                console.log(`❌ No active Redis session found for player ${username}`);
+                return disconnectWithError(socket, "You must be connected to the Playground first.");
             }
-            existingManager.initializeManager(socket);
-            socket.emit(messageType.ALERT, `Manager ${username} has been reconnected.`);
-        } else {
-            const newManager = new Manager(username, credits, role, userAgent, socket);
-            sessionManager.addManager(username, newManager)
-            socket.emit(messageType.ALERT, `Manager ${username} has been connected.`);
+
+            if (playgroundSession.status !== "active") {
+                console.log(`🚫 Player ${username} is inactive`);
+                return disconnectWithError(socket, "Your account is inactive. Please contact support.");
+            }
+
+            const currentGame = playgroundSession.currentGame && playgroundSession.currentGame !== "null"
+                ? JSON.parse(playgroundSession.currentGame)
+                : null;
+
+            if (currentGame) {
+                console.log(`⚠️ Player ${username} is already in a game: ${currentGame.gameId}`);
+                return disconnectWithError(socket, "You are already playing a game. Finish your current session first.");
+            }
+
+            // Validate In - Memory Session **
+            let existingSession = await sessionManager.getPlaygroundSession(username);
+            if (!existingSession || !existingSession.platformData?.socket.connected) {
+                return disconnectWithError(socket, "You must be connected to a Playground first.");
+            }
+
+            console.log(`🎰 Player ${username} entering game, updating socket session`);
+
+            await existingSession.updateGameSocket(socket);
+            existingSession.sendAlert(`🎰 Welcome to the Game: ${existingSession.currentGameData.gameId}`);
+        } catch (error) {
+            return disconnectWithError(socket, "Failed to enter the Arena");
         }
 
     });
 
-    console.log(`⚡ WebSocket server running on worker ${cluster.worker?.id}`);
+    namespaces.control.on("connection", async (socket) => {
+        try {
+            const { username, role } = socket.data.user;
+            const { credits } = await getManagerDetails(username);
+            const userAgent = socket.handshake.headers["user-agent"];
+
+            // **Create new manager instance**
+            const newManager = new Manager(username, credits, role, userAgent, socket);
+            socket.emit(messageType.ALERT, `Manager ${username} has been connected.`);
+
+        } catch (error) {
+            console.error(`❌ Error handling manager connection:`, error);
+            socket.emit(messageType.ERROR, "Failed to establish connection");
+            socket.disconnect();
+        }
+    });
 }
 
 function disconnectWithError(socket: any, message: string) {

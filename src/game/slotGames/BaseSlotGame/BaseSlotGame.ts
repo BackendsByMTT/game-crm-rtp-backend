@@ -317,7 +317,7 @@ export default class BaseSlotGame implements RequiredSocketMethods {
   private async spinResult() {
     try {
       const playerData = this.getPlayerData();
-      const platformSession = sessionManager.getPlayerPlatform(playerData.username);
+      const platformSession = await sessionManager.getPlaygroundSession(playerData.username);
 
       if (this.settings.currentBet > playerData.credits) {
         console.log("Low Balance : ", playerData.credits);
