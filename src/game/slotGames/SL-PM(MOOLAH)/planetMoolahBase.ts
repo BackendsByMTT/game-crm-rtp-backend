@@ -74,7 +74,7 @@ export class SLPM {
     public async spinResult(): Promise<void> {
         try {
             const playerData = this.getPlayerData();
-            const platformSession = sessionManager.getPlayerPlatform(playerData.username);
+            const platformSession = await sessionManager.getPlaygroundSession(playerData.username);
 
             if (this.settings.currentBet > playerData.credits) {
                 console.log(this.settings.currentBet + playerData.credits, 'dfdsfds')

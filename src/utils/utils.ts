@@ -103,7 +103,7 @@ export interface CustomJwtPayload extends JwtPayload {
   role: string;
 }
 
-export const updateStatus = (client: IUser | IPlayer, status: string) => {
+export const updateStatus = async (client: IUser | IPlayer, status: string) => {
   // Destroy SlotGame instance if we update user to inactive && the client is currently in a game
   const validStatuses = ["active", "inactive"];
   if (!validStatuses.includes(status)) {
@@ -112,7 +112,7 @@ export const updateStatus = (client: IUser | IPlayer, status: string) => {
   client.status = status;
   for (const [username, playerSocket] of sessionManager.getPlatformSessions()) {
     if (playerSocket) {
-      const socketUser = sessionManager.getPlayerPlatform(client.username)
+      const socketUser = await sessionManager.getPlaygroundSession(client.username)
       if (socketUser) {
         if (status === 'inactive') {
           socketUser.forceExit();

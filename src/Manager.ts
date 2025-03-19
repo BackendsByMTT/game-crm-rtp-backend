@@ -47,6 +47,22 @@ export default class Manager {
                     this.socketData.socket.emit("PLATFORM", { type: "ENTERED_PLATFORM", payload: data.payload });
                     break;
 
+                case NewEventType.PLAYGROUND_EXITED:
+                    this.socketData.socket.emit("PLATFORM", { type: "EXITED_PLATFORM", payload: data.payload });
+                    break
+
+                case NewEventType.GAME_STARTED:
+                    this.socketData.socket.emit("PLATFORM", { type: "ENTERED_GAME", payload: data.payload });
+                    break;
+
+                case NewEventType.GAME_ENDED:
+                    this.socketData.socket.emit("PLATFORM", { type: "EXITED_GAME", payload: data.payload });
+                    break;
+
+                case NewEventType.UPDATE_SPIN:
+                    this.socketData.socket.emit("PLATFORM", { type: "UPDATE_SPIN", payload: data.payload });
+                    break;
+
                 default:
                     console.log(`Unknown message type: ${data.type}`);
             }
@@ -169,7 +185,7 @@ export default class Manager {
             }
 
             // Notify the player socket of the status change
-            const playerSocket = sessionManager.getPlayerPlatform(data.playerId)
+            const playerSocket = await sessionManager.getPlaygroundSession(data.playerId)
 
             if (playerSocket) {
                 if (data.status === "inactive") {

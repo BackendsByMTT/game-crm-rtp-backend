@@ -8,7 +8,7 @@ import cloudinary from "cloudinary";
 import { config } from "../../config/config";
 import Payouts from "../payouts/payoutModel";
 import path from "path";
-import { sessionManager } from "../session/sessionManager";
+import { redisClient } from "../../config/redis";
 
 cloudinary.v2.config({
   cloud_name: config.cloud_name,
@@ -168,27 +168,24 @@ export class GameController {
         throw createHttpError(400, "Slug parameter is required");
       }
 
-      // Get player session and validate connection state
-      const existingSession = sessionManager.getPlayerPlatform(username);
-
-      if (!existingSession) {
-        // No session exists at all
-        console.log(`No session found for player ${username}`);
+      const playerSession = await redisClient.pubClient.hGetAll(`playground:${username}`);
+      if (!playerSession || Object.keys(playerSession).length === 0) {
+        console.log(`❌ No active Redis session found for player ${username}`);
         throw createHttpError(403, "No active session found. Please reconnect to the platform");
       }
 
-      // Enhanced logging for debugging connection state
-      const gameActive = existingSession.currentGameData &&
-        existingSession.currentGameData.socket &&
-        existingSession.currentGameData.socket.connected;
+      // Ensure player is active
+      if (playerSession.status !== "active") {
+        console.log(`Player ${username} is inactive`);
+        throw createHttpError(403, "Account is inactive, please contact support");
+      }
 
-      console.log(`Connection state for ${username}: Game: ${gameActive}`);
-
-      // Check if player has any active game session
-      if (gameActive) {
-        console.log(`Player ${username} already has an active game`);
+      // Check if the player has an active game session
+      if (playerSession.currentGame !== "null") {
+        console.log(`Player ${username} already has an active game: ${playerSession.currentGame}`);
         throw createHttpError(403, "You already have an active game session. Please finish your current game first");
       }
+
 
       const platform = await Platform.aggregate([
         { $unwind: "$games" },

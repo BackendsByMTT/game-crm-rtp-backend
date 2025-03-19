@@ -78,7 +78,7 @@ export class SLAOG {
   public async spinResult(): Promise<void> {
     try {
       const playerData = this.getPlayerData();
-      const platformSession = sessionManager.getPlayerPlatform(playerData.username);
+      const platformSession = await sessionManager.getPlaygroundSession(playerData.username);
 
       if (this.settings.currentBet > playerData.credits) {
         this.sendError("Low Balance");
@@ -89,16 +89,16 @@ export class SLAOG {
       if (!(this.settings.freeSpinCount > 0)) {
 
         this.deductPlayerBalance(currentBet);
-        this.playerData.totalbet =precisionRound(this.playerData.totalbet + currentBet, 5);
-      }else{
-        this.settings.freeSpinCount --
+        this.playerData.totalbet = precisionRound(this.playerData.totalbet + currentBet, 5);
+      } else {
+        this.settings.freeSpinCount--
       }
 
 
       const spinId = platformSession.currentGameSession.createSpin();
       platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
 
-       new RandomResultGenerator(this);
+      new RandomResultGenerator(this);
       checkForWin(this)
       const winAmount = this.playerData.currentWining;
       platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', winAmount);

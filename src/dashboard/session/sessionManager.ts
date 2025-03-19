@@ -1,4 +1,3 @@
-import mongoose from "mongoose";
 import { redisClient } from "../../config/redis";
 import Manager from "../../Manager";
 import PlayerSocket from "../../Player";
@@ -14,9 +13,14 @@ class SessionManager {
     private platformSessions: Map<string, PlayerSocket> = new Map();
     private currentActiveManagers: Map<string, Manager> = new Map();
 
+    private playground: Map<string, PlayerSocket> = new Map();
+    private control: Map<string, Manager> = new Map();
+
     public async startSession(player: PlayerSocket) {
         try {
             const sessionData = player.getSummary();
+
+            this.playground.set(player.playerData.username, player);
 
             await redisClient.pubClient.hSet(
                 `playground:${player.playerData.username}`,
@@ -39,14 +43,97 @@ class SessionManager {
 
             await this.notify(player.playerData.username, NewEventType.PLAYGROUND_JOINED, sessionData);
             this.sessionHeartbeat(player);
-            console.log(`Playground session stored in Redis for ${player.playerData.username}`);
+
+            console.log(`✅ Playground session stored in Redis & memory for ${player.playerData.username}`);
         } catch (error) {
             console.error(`Failed to save playground session for player: ${player.playerData.username}`, error);
         }
     }
 
-    public async endSession(player: PlayerSocket) { 
-        
+    // TODO: Need to fix why it disconnects automatically when joined
+    public async endSession(player: PlayerSocket) {
+        try {
+            this.playground.delete(player.playerData.username);
+            await redisClient.pubClient.del(`playground:${player.playerData.username}`);
+            await this.notify(player.playerData.username, NewEventType.PLAYGROUND_EXITED, player.getSummary());
+            await PlatformSessionModel.updateOne(
+                { playerId: player.playerData.username, entryTime: player.entryTime },
+                { $set: { exitTime: new Date() } }
+            )
+
+        } catch (error) {
+            console.error(`Failed to delete playground session for player: ${player.playerData.username}`, error);
+        }
+    }
+
+    public async startGame(player: PlayerSocket) {
+        try {
+            player.currentGameSession = new GameSession(player.playerData.username, player.currentGameData.gameId, player.playerData.credits);
+
+            player.currentGameSession.on(NewEventType.UPDATE_SPIN, async (summary) => {
+                await this.notify(player.playerData.username, NewEventType.UPDATE_SPIN, summary);
+            });
+
+            const gameSummary = player.currentGameSession?.getSummary();
+            await redisClient.pubClient.hSet(
+                `playground:${player.playerData.username}`,
+                { "currentGame": JSON.stringify(gameSummary) }
+            )
+
+            await this.notify(player.playerData.username, NewEventType.GAME_STARTED, gameSummary);
+        } catch (error) {
+            console.error(`Failed to start game session for player: ${player.playerData.username}`, error);
+        }
+    }
+
+    public async endGame(player: PlayerSocket) {
+        try {
+            console.log(`🎮 ENDING GAME SESSION FOR ${player.playerData.username}`);
+            if (!player.currentGameSession) {
+                console.warn(`⚠️ No active game session found for ${player.playerData.username}`);
+                return;
+            }
+
+            const gameSummary = player.currentGameSession.getSummary();
+            console.log(`GAME SUMMARY FOR ${player.playerData.username}:`, gameSummary);
+
+            player.currentGameSession.exitTime = new Date();
+            player.currentGameSession.creditsAtExit = player.playerData.credits;
+            player.currentGameSession.sessionDuration = Math.abs(player.currentGameSession.exitTime.getTime() - player.currentGameSession.entryTime.getTime());
+            player.currentGameSession = null;
+            player.currentGameData.session = null;
+
+            if (player.currentGameData.socket) {
+                console.log(`Disconnecting game socket for ${player.playerData.username}`);
+                player.currentGameData.socket.disconnect();
+                player.currentGameData.socket = null;
+            }
+
+            if (player.currentGameData.heartbeatInterval) {
+                clearInterval(player.currentGameData.heartbeatInterval);
+                console.log(`💓 Cleared game heartbeat for ${player.playerData.username}`);
+            }
+
+            await redisClient.pubClient.hDel(`playground:${player.playerData.username}`, "currentGame");
+
+            await PlatformSessionModel.updateOne(
+                { playerId: player.playerData.username, entryTime: player.entryTime },
+                { $push: { gameSessions: gameSummary }, $set: { currentRTP: player.currentRTP } }
+            )
+
+            await this.notify(player.playerData.username, NewEventType.GAME_ENDED, gameSummary);
+            console.log(`✅ Successfully ended game session for ${player.playerData.username}`);
+
+        } catch (error) {
+            console.error(`❌ Failed to end game session for player: ${player.playerData.username}`, error);
+        }
+    }
+
+    public async getPlaygroundSession(username: string): Promise<PlayerSocket | null> {
+        if (this.playground.has(username)) {
+            return this.playground.get(username) || null;
+        }
+        return null;
     }
 
     private async notify(username: string, eventType: NewEventType, payload: any) {
@@ -83,136 +170,10 @@ class SessionManager {
 
     // OLD CODE
 
-    public async startPlatformSession(player: PlayerSocket) {
-        this.platformSessions.set(player.playerData.username, player);
-        try {
-            const platformSessionData = new PlatformSessionModel(player.getSummary())
-            await platformSessionData.save();
-
-            await this.notifyManagers(player.managerName, eventType.ENTERED_PLATFORM, player.getSummary());
-        } catch (error) {
-            console.error(`Failed to save platform session for player: ${player.playerData.username}`, error);
-        } finally {
-            console.log(`PLATFORM STARTED : `, player.playerData.username)
-        }
-    }
-
-    public async endPlatformSession(playerId: string) {
-        try {
-            const platformSession = this.getPlayerPlatform(playerId)
-            if (platformSession) {
-                platformSession.setExitTime();
-                this.platformSessions.delete(playerId);
-
-                await this.notifyManagers(platformSession.managerName, eventType.EXITED_PLATFORM, platformSession.getSummary());
-
-                await PlatformSessionModel.updateOne(
-                    { playerId: playerId, entryTime: platformSession.entryTime },
-                    { $set: { exitTime: platformSession.exitTime } }
-                )
-            }
-        } catch (error) {
-            console.error(`Failed to save platform session for player: ${playerId}`, error);
-        }
-
-    }
-
-
-    public async startGameSession(playerId: string, gameId: string, credits: number) {
-        const platformSession = this.getPlayerPlatform(playerId);
-        if (platformSession) {
-            platformSession.currentGameSession = new GameSession(playerId, gameId, credits);
-
-            platformSession.currentGameSession.on("spinUpdated", async (summary) => {
-                await this.notifyManagers(platformSession.managerName, eventType.UPDATED_SPIN, summary);
-            });
-
-            platformSession.currentGameSession.on("sessionEnded", async (summary) => {
-                await this.notifyManagers(platformSession.managerName, eventType.EXITED_GAME, summary);
-            });
-
-            const gameSummary = platformSession.currentGameSession?.getSummary();
-
-            if (gameSummary) {
-                await this.notifyManagers(platformSession.managerName, eventType.ENTERED_GAME, gameSummary);
-            } else {
-                console.error(`No active platform session found for player: ${playerId}`);
-            }
-        } else {
-            console.error(`No active platform session found for player: ${playerId}`);
-        }
-    }
-
-    public async endGameSession(playerId: string, credits: number) {
-        try {
-            const platformSession = this.getPlayerPlatform(playerId);
-            if (platformSession && platformSession.currentGameSession) {
-                // End and delete the current game session
-                platformSession.currentGameSession.endSession(platformSession.playerData.credits);
-                const gameSessionData = platformSession.currentGameSession.getSummary();
-
-                await this.notifyManagers(platformSession.managerName, eventType.EXITED_GAME, gameSessionData);
-
-                await PlatformSessionModel.updateOne(
-                    { playerId: playerId, entryTime: platformSession.entryTime },
-                    { $push: { gameSessions: gameSessionData }, $set: { currentRTP: platformSession.currentRTP } }
-                );
-
-                platformSession.currentGameSession = null;
-                console.log(`Current game session deleted for player: ${playerId}`);
-            }
-        } catch (error) {
-            console.error(`Failed to delete the current game session for player: ${playerId}`, error);
-        }
-
-    }
-
-    private async notifyManagers(managerName: string, eventType: string, payload: any) {
-
-        try {
-            const admin = this.getActiveManagerByRole('admin');
-            if (admin) {
-                admin.notifyManager({ type: eventType, payload });
-            }
-
-            const manager = await User.findOne({ username: managerName }).exec();
-
-            if (manager.role === 'store') {
-                // Get top hierarchy user until company and notify company, store, and admin
-                const topUser = await this.getTopUserUntilCompany(manager.username);
-                if (topUser) {
-                    const companyManager = this.getActiveManagerByUsername(topUser.username);
-                    if (companyManager) {
-                        companyManager.notifyManager({ type: eventType, payload });
-                    }
-                }
-
-                const storeManager = this.getActiveManagerByUsername(manager.username);
-                if (storeManager) {
-                    storeManager.notifyManager({ type: eventType, payload });
-                }
-            } else {
-                const company = this.getActiveManagerByUsername(manager.username);
-                if (company) {
-                    company.notifyManager({ type: eventType, payload });
-                }
-            }
-        } catch (error) {
-            console.error('Failed to notify managers', error);
-        }
-    }
-
-
     public getPlatformSessions(): Map<string, PlayerSocket> {
         return this.platformSessions;
     }
 
-    public getPlayerPlatform(username: string): PlayerSocket | null {
-        if (this.platformSessions.has(username)) {
-            return this.platformSessions.get(username) || null
-        }
-        return null
-    }
 
 
     public async getPlayersSummariesByManager(managerUsername: string, managerRole: string): Promise<any[]> {
@@ -245,8 +206,9 @@ class SessionManager {
         return user.role === "supermaster" ? user : null;
     }
 
-    public getPlayerCurrentGameSession(username: string) {
-        return this.getPlayerPlatform(username)?.currentGameSession;
+    public async getPlayerCurrentGameSession(username: string) {
+        const playerSession = await this.getPlaygroundSession(username);
+        return playerSession?.currentGameSession || null;
     }
 
     public addManager(username: string, manager: Manager): void {
@@ -265,15 +227,6 @@ class SessionManager {
     public getActiveManagerByUsername(username: string): Manager | null {
         if (this.currentActiveManagers.has(username)) {
             return this.currentActiveManagers.get(username) || null
-        }
-        return null;
-    }
-
-    private getActiveManagerByRole(role: string): Manager | null {
-        for (const manager of this.currentActiveManagers.values()) {
-            if (manager.role === role) {
-                return manager;
-            }
         }
         return null;
     }

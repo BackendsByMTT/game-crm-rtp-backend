@@ -54,11 +54,6 @@ export default class PlayerSocket {
 
 
   constructor(username: string, role: string, status: string, credits: number, userAgent: string, socket: Socket, managerName: string) {
-    const existing = sessionManager.getPlayerPlatform(username);
-    if (existing && existing.platformData.socket.id !== socket.id) {
-      existing.initializePlatformSocket(socket);
-      return;
-    }
 
     this.playerData = {
       username, role, credits, userAgent, status
@@ -128,7 +123,6 @@ export default class PlayerSocket {
       this.platformData.platformId = socket.handshake.auth.platformId;
 
       this.messageHandler(false);
-      // this.startPlatformHeartbeat();
       this.onExit();
 
       if (this.platformData.socket) {
@@ -139,10 +133,7 @@ export default class PlayerSocket {
         console.error("Socket is null during initialization of disconnect event");
       }
 
-      // await sessionManager.startPlatformSession(this);
       await sessionManager.startSession(this);
-      // this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits } }, "platform");
-
     } catch (error) {
       console.error("Error initializing platform socket:", error);
     }
@@ -156,21 +147,14 @@ export default class PlayerSocket {
 
     this.currentGameData.socket = socket;
     this.currentGameData.gameId = socket.handshake.auth.gameId;
-
-    await redisClient.pubClient.hSet(
-      `playground:${this.playerData.username}`,
-      {
-        "currentGame": this.currentGameData.gameId || "none"
-      }
-    )
-    sessionManager.startGameSession(this.playerData.username, this.currentGameData.gameId, this.playerData.credits)
-
     this.currentGameData.socket.on("disconnect", () => this.handleGameDisconnection());
     this.initGameData();
     this.startGameHeartbeat();
     this.onExit(true)
     this.messageHandler(true);
     this.currentGameData.socket.emit("socketState", true);
+
+    await sessionManager.startGame(this);
   }
 
   // Handle platform disconnection and reconnection
@@ -187,50 +171,30 @@ export default class PlayerSocket {
 
   // Cleanup only the game socket
   private async cleanupGameSocket() {
-    await sessionManager.endGameSession(this.playerData.username, this.playerData.credits);
-
-    await redisClient.pubClient.hSet(
-      `playground:${this.playerData.username}`,
-      {
-        "currentGame": "none"
-      }
-    )
-
-    if (this.currentGameData.socket) {
-      this.currentGameData.socket.disconnect(true);
-      this.currentGameData.socket = null;
-    }
-
-    clearInterval(this.currentGameData.heartbeatInterval);
-
-    // Nullify all game-related data
-    this.currentGameData.currentGameManager = null;
-    this.currentGameData.gameSettings = null;
-    this.currentGameData.gameId = null;
-    this.currentGameData.session = null;
-    this.currentGameSession = null;
-
-    if (process.env.NODE_ENV === "testing") {
-      this.cleanupPlatformSocket()
+    try {
+      await sessionManager.endGame(this);
+    } catch (error) {
+      console.error(`❌ Error cleaning up game session for ${this.playerData.username}:`, error);
     }
   }
 
-  // Cleanup only the platform socket
   public async cleanupPlatformSocket() {
+    try {
+      await sessionManager.endSession(this);
 
-    await sessionManager.endPlatformSession(this.playerData.username);
+      if (this.platformData.socket) {
+        this.platformData.platformId = null;
+        this.platformData.socket.disconnect(true);
+        this.platformData.socket = null;
+      }
 
-    if (this.platformData.socket) {
-      this.platformData.platformId = null;
-      this.platformData.socket.disconnect(true);
-      this.platformData.socket = null;
+      clearInterval(this.platformData.heartbeatInterval);
+      this.platformData.reconnectionAttempts = 0;
+      this.platformData.cleanedUp = true;
+
+    } catch (error) {
+      console.error("Error cleaning up platform socket:")
     }
-
-    clearInterval(this.platformData.heartbeatInterval);
-    this.platformData.reconnectionAttempts = 0;
-    this.platformData.cleanedUp = true;
-
-    await redisClient.pubClient.del(`playground:${this.playerData.username}`);
   }
 
   // Attempt reconnection  for platform or game socket based on provided data

@@ -184,7 +184,7 @@ export class UserController {
       // });
 
 
-      const socketUser = sessionManager.getPlayerPlatform(username);
+      const socketUser = await sessionManager.getPlaygroundSession(username);
 
       if (socketUser?.platformData.socket?.connected || socketUser?.currentGameData.socket) {
         throw createHttpError(403, "Already logged in on another browser or tab.");
@@ -214,7 +214,8 @@ export class UserController {
         throw createHttpError(400, "Username is required");
       }
 
-      const platformSession = sessionManager.getPlayerPlatform(username);
+      // TODO: we have to change this according to redis
+      const platformSession = await sessionManager.getPlaygroundSession(username);
       if (platformSession) {
         await platformSession.cleanupPlatformSocket()
       }
