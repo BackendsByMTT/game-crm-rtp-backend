@@ -1,15 +1,87 @@
+import mongoose from "mongoose";
+import { redisClient } from "../../config/redis";
 import Manager from "../../Manager";
 import PlayerSocket from "../../Player";
 import { eventType } from "../../utils/utils";
-import { User } from "../users/userModel";
+import { Player, User } from "../users/userModel";
 import { IUser } from "../users/userType";
 import { GameSession } from "./gameSession";
 import { PlatformSessionModel } from "./sessionModel";
+import { NewEventType } from "../../utils/eventTypes";
 
 
 class SessionManager {
     private platformSessions: Map<string, PlayerSocket> = new Map();
     private currentActiveManagers: Map<string, Manager> = new Map();
+
+    public async startSession(player: PlayerSocket) {
+        try {
+            const sessionData = player.getSummary();
+
+            await redisClient.pubClient.hSet(
+                `playground:${player.playerData.username}`,
+                {
+                    "playerId": sessionData.playerId,
+                    "status": sessionData.status,
+                    "initialCredits": sessionData.initialCredits?.toString() || "0",
+                    "currentCredits": sessionData.currentCredits?.toString() || "0",
+                    "managerName": sessionData.managerName || "",
+                    "entryTime": sessionData.entryTime.toISOString(),
+                    "exitTime": sessionData.exitTime ? sessionData.exitTime.toISOString() : "null",
+                    "currentRTP": sessionData.currentRTP?.toString() || "0",
+                    "currentGame": sessionData.currentGame ? JSON.stringify(sessionData.currentGame) : "null",
+                    "userAgent": sessionData.userAgent || "",
+                    "platformId": sessionData.platformId?.toString() || "",
+                }
+            );
+            const playgroundSessionData = new PlatformSessionModel(sessionData);
+            await playgroundSessionData.save();
+
+            await this.notify(player.playerData.username, NewEventType.PLAYGROUND_JOINED, sessionData);
+            this.sessionHeartbeat(player);
+            console.log(`Playground session stored in Redis for ${player.playerData.username}`);
+        } catch (error) {
+            console.error(`Failed to save playground session for player: ${player.playerData.username}`, error);
+        }
+    }
+
+    public async endSession(player: PlayerSocket) { 
+        
+    }
+
+    private async notify(username: string, eventType: NewEventType, payload: any) {
+        try {
+            const hierarchyUsers = await Player.getHierarchyUsers(username);
+
+            for (const manager of hierarchyUsers) {
+                const channel = `control:${manager.role}:${manager.username}`;
+                await redisClient.pubClient.publish(channel, JSON.stringify({ type: eventType, payload }));
+                console.log(`📢 Published event to ${channel}:`, { type: eventType, payload });
+            }
+
+        } catch (error) {
+            console.error("❌ Failed to publish notifications to Redis:", error);
+        }
+    }
+
+    private async sessionHeartbeat(player: PlayerSocket) {
+        if (!player || !player.platformData.socket) return;
+
+        player.sendData({ type: "CREDIT", data: { credits: player.playerData.credits } }, "platform");
+
+        player.platformData.heartbeatInterval = setInterval(() => {
+            if (!player.platformData.socket || !player.platformData.socket.connected) {
+                clearInterval(player.platformData.heartbeatInterval);
+                console.log(`💔 Stopped heartbeat for ${player.playerData.username}`);
+                return;
+            }
+
+            player.sendData({ type: "CREDIT", data: { credits: player.playerData.credits, worker: process.pid } }, "platform");
+        }, 5000); // Update every 5 seconds
+    }
+
+
+    // OLD CODE
 
     public async startPlatformSession(player: PlayerSocket) {
         this.platformSessions.set(player.playerData.username, player);

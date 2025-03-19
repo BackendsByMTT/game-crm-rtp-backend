@@ -3,6 +3,7 @@ import { Player } from "./dashboard/users/userModel";
 import { sessionManager } from "./dashboard/session/sessionManager";
 import { PlatformSessionModel } from "./dashboard/session/sessionModel";
 import { redisClient } from "./config/redis";
+import { NewEventType } from "./utils/eventTypes";
 
 
 export interface socketConnectionData {
@@ -30,6 +31,7 @@ export default class Manager {
         this.subscribeToRedisEvents();
     }
 
+
     private subscribeToRedisEvents() {
         redisClient.subClient.subscribe(`control:${this.role}:${this.username}`, (message) => {
             const data = JSON.parse(message);
@@ -39,6 +41,10 @@ export default class Manager {
                 case "UPDATE_BALANCE":
                     this.credits = data.payload.credits;
                     this.sendData({ type: "CREDIT", data: { credits: this.credits } });
+                    break;
+
+                case NewEventType.PLAYGROUND_JOINED:
+                    this.socketData.socket.emit("PLATFORM", { type: "ENTERED_PLATFORM", payload: data.payload });
                     break;
 
                 default:

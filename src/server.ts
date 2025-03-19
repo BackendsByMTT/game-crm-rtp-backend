@@ -7,8 +7,6 @@ import { Player as PlayerModel, User } from "./dashboard/users/userModel";
 import { IUser } from "./dashboard/users/userType";
 import { messageType } from "./game/Utils/gameUtils";
 import Manager from "./Manager";
-import { createClient } from "redis";
-import { config } from "./config/config";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { redisClient } from "./config/redis";
 

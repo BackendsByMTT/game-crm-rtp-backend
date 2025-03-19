@@ -124,12 +124,11 @@ export default class PlayerSocket {
         await this.cleanupGameSocket()
       }
 
-      await sessionManager.startPlatformSession(this)
       this.platformData.socket = socket;
       this.platformData.platformId = socket.handshake.auth.platformId;
 
       this.messageHandler(false);
-      this.startPlatformHeartbeat();
+      // this.startPlatformHeartbeat();
       this.onExit();
 
       if (this.platformData.socket) {
@@ -140,16 +139,9 @@ export default class PlayerSocket {
         console.error("Socket is null during initialization of disconnect event");
       }
 
-      await redisClient.pubClient.hSet(
-        `playground:${this.playerData.username}`,
-        {
-          "platformId": this.platformData.platformId || "none",
-          "userAgent": this.playerData.userAgent || "unknown",
-          "currentGame": this.currentGameData.gameId || "none"
-        }
-      );
-
-      this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits } }, "platform");
+      // await sessionManager.startPlatformSession(this);
+      await sessionManager.startSession(this);
+      // this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits } }, "platform");
 
     } catch (error) {
       console.error("Error initializing platform socket:", error);
@@ -273,18 +265,18 @@ export default class PlayerSocket {
 
 
   // Start heartbeat for platform socket
-  private startPlatformHeartbeat() {
-    if (this.platformData.socket) {
-      this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits } }, "platform");
+  // private startPlatformHeartbeat() {
+  //   if (this.platformData.socket) {
+  //     this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits } }, "platform");
 
-      this.platformData.heartbeatInterval = setInterval(() => {
-        if (this.currentGameData.socket) {
-          this.sendAlert(`Currenlty Playing : ${this.currentGameData.gameId}`)
-        }
-        this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits, worker: process.pid } }, "platform");
-      }, 5000)
-    }
-  }
+  //     this.platformData.heartbeatInterval = setInterval(() => {
+  //       if (this.currentGameData.socket) {
+  //         this.sendAlert(`Currenlty Playing : ${this.currentGameData.gameId}`)
+  //       }
+  //       this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits, worker: process.pid } }, "platform");
+  //     }, 5000)
+  //   }
+  // }
 
   // Start heartbeat for game socket
   private startGameHeartbeat() {
@@ -508,7 +500,8 @@ export default class PlayerSocket {
       exitTime: this.exitTime,
       currentRTP: this.currentRTP,
       currentGame: this.currentGameSession?.getSummary() || null,
-      userAgent: this.playerData.userAgent
+      userAgent: this.playerData.userAgent,
+      platformId: this.platformData.platformId
     }
   }
 
