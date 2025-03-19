@@ -12,6 +12,7 @@ import { socketConnectionData } from "./utils/utils";
 import { sessionManager } from "./dashboard/session/sessionManager";
 import { GameSession } from "./dashboard/session/gameSession";
 import { redisClient } from "./config/redis";
+import { NewEventType } from "./utils/eventTypes";
 
 
 export interface currentGamedata {
@@ -105,6 +106,19 @@ export default class PlayerSocket {
           this.playerData.credits = data.payload.credits;
           this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits } }, "platform");
           break;
+
+        case NewEventType.UPDATE_PAYOUT:
+          if (this.currentGameData.gameId === data.payload.tagName) {
+            console.log(`🎮 Updating game settings for ${this.playerData.username}`);
+
+            // Update game settings dynamically
+            this.currentGameData.gameSettings = data.payload.payoutData;
+            this.currentGameData.currentGameManager.currentGameType.currentGame.initialize(data.payload.payoutData);
+
+            this.sendAlert(`Game ${data.payload.tagName} updated to version ${data.payload.newVersion}`, true);
+          }
+
+
 
         default:
           console.log(`Unknown message type: ${data.type}`);
@@ -228,20 +242,6 @@ export default class PlayerSocket {
   }
 
 
-  // Start heartbeat for platform socket
-  // private startPlatformHeartbeat() {
-  //   if (this.platformData.socket) {
-  //     this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits } }, "platform");
-
-  //     this.platformData.heartbeatInterval = setInterval(() => {
-  //       if (this.currentGameData.socket) {
-  //         this.sendAlert(`Currenlty Playing : ${this.currentGameData.gameId}`)
-  //       }
-  //       this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits, worker: process.pid } }, "platform");
-  //     }, 5000)
-  //   }
-  // }
-
   // Start heartbeat for game socket
   private startGameHeartbeat() {
     if (this.currentGameData.socket) {
@@ -260,10 +260,12 @@ export default class PlayerSocket {
       socket.disconnect(true);
       throw createHttpError(403, "Platform connection required before joining a game.");
     }
+    const MOBILE_USER_AGENT_REGEX = /android|iphone|ipad|ipod|mobile|okhttp/i;
+    const isMobile = this.playerData.userAgent ? MOBILE_USER_AGENT_REGEX.test(this.playerData.userAgent) : false;
 
     // Skip user-agent validation in the testing environment
     if (process.env.NODE_ENV !== "testing") {
-      if (socket.request.headers["user-agent"] !== this.playerData.userAgent) {
+      if (!isMobile && (socket.request.headers["user-agent"] !== this.playerData.userAgent)) {
         socket.emit("alert", {
           id: "AnotherDevice",
           message: "You are already playing on another browser",

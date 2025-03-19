@@ -1,7 +1,6 @@
 import { redisClient } from "../../config/redis";
 import Manager from "../../Manager";
 import PlayerSocket from "../../Player";
-import { eventType } from "../../utils/utils";
 import { Player, User } from "../users/userModel";
 import { IUser } from "../users/userType";
 import { GameSession } from "./gameSession";
@@ -10,8 +9,6 @@ import { NewEventType } from "../../utils/eventTypes";
 
 
 class SessionManager {
-    private platformSessions: Map<string, PlayerSocket> = new Map();
-    private currentActiveManagers: Map<string, Manager> = new Map();
 
     private playground: Map<string, PlayerSocket> = new Map();
     private control: Map<string, Manager> = new Map();
@@ -167,77 +164,38 @@ class SessionManager {
         }, 5000); // Update every 5 seconds
     }
 
-
-    // OLD CODE
-
-    public getPlatformSessions(): Map<string, PlayerSocket> {
-        return this.platformSessions;
-    }
-
-
-
-    public async getPlayersSummariesByManager(managerUsername: string, managerRole: string): Promise<any[]> {
-        const playerSummaries: any[] = [];
-        let isAllowed = managerRole === 'admin';
-
-        if (managerRole === 'store') {
-            const topUser = await this.getTopUserUntilCompany(managerUsername);
-            isAllowed = !!topUser;
+    public async addControlUser(user: Manager) {
+        try {
+            this.control.set(user.username, user);
+            await redisClient.pubClient.hSet(
+                `control:${user.role}:${user.username}`,
+                {
+                    "username": user.username,
+                    "role": user.role,
+                    "credits": user.credits.toString(),
+                    "userAgent": user.userAgent || "",
+                }
+            );
+            console.log(`✅ Control session stored in Redis & memory for ${user.username}`);
+        } catch (error) {
+            console.error(`❌ Failed to save control session for user: ${user.username}`, error);
         }
-
-        this.platformSessions.forEach((session, playerId) => {
-            if (isAllowed || session.managerName === managerUsername) {
-                playerSummaries.push(session.getSummary());
-            }
-        });
-        return playerSummaries;
     }
 
-    async getTopUserUntilCompany(username: string): Promise<IUser | null> {
-        let user = await User.findOne({ username }).exec();
-        if (!user) return null;
-
-        while (user.createdBy && user.role !== "supermaster") {
-            const parentUser = await User.findById(user.createdBy).exec();
-            if (!parentUser) break;
-            user = parentUser;
+    public async removeControlUser(username: string) {
+        try {
+            this.control.delete(username);
+            await redisClient.pubClient.del(`control:${username}`);
+            console.log(`✅ Control session deleted from Redis & memory for ${username}`);
+        } catch (error) {
+            console.error(`❌ Failed to delete control session for user: ${username}`, error);
         }
-
-        return user.role === "supermaster" ? user : null;
     }
+
 
     public async getPlayerCurrentGameSession(username: string) {
         const playerSession = await this.getPlaygroundSession(username);
         return playerSession?.currentGameSession || null;
-    }
-
-    public addManager(username: string, manager: Manager): void {
-        if (this.currentActiveManagers.has(username)) {
-            console.warn(`Manager with username "${username}" already exists in currentActiveManagers.`);
-        } else {
-            this.currentActiveManagers.set(username, manager);
-            console.log(`Manager with username "${username}" has been added to currentActiveManagers.`);
-        }
-    }
-
-    public getActiveManagers(): Map<string, Manager> {
-        return this.currentActiveManagers;
-    }
-
-    public getActiveManagerByUsername(username: string): Manager | null {
-        if (this.currentActiveManagers.has(username)) {
-            return this.currentActiveManagers.get(username) || null
-        }
-        return null;
-    }
-
-    public deleteManagerByUsername(username: string): void {
-        if (this.currentActiveManagers.has(username)) {
-            this.currentActiveManagers.delete(username);
-            console.log(`Manager with username "${username}" has been removed from currentActiveManagers.`);
-        } else {
-            console.warn(`Manager with username "${username}" not found in currentActiveManagers.`);
-        }
     }
 
 }

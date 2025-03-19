@@ -184,35 +184,7 @@ const handlePlayerConnection = async (socket: Socket, decoded: DecodedToken, use
 
 
 const handleManagerConnection = async (socket: Socket, decoded: DecodedToken, userAgent: string) => {
-    const username = decoded.username;
-    const role = decoded.role
-    const { credits } = await getManagerDetails(username);
-    console.log("MANAGER CONNECTION")
 
-    let existingManager = sessionManager.getActiveManagerByUsername(username);
-
-    if (existingManager) {
-        console.log(`Reinitializing manager ${username}`);
-
-        if (existingManager.socketData.reconnectionTimeout) {
-            clearTimeout(existingManager.socketData.reconnectionTimeout);
-        }
-
-        existingManager.initializeManager(socket);
-        socket.emit(messageType.ALERT, `Manager ${username} has been reconnected.`);
-    } else {
-        const newManager = new Manager(username, credits, role, userAgent, socket);
-        sessionManager.addManager(username, newManager)
-        socket.emit(messageType.ALERT, `Manager ${username} has been connected.`);
-    }
-
-    // Send all active players to the manager upon connection
-    // const activeUsersData = Array.from(sessionManager.getPlatformSessions().values()).map(player => {
-    //     const platformSession = sessionManager.getPlayerPlatform(player.playerData.username);
-    //     return platformSession?.getSummary() || {};
-    // });
-
-    // socket.emit("activePlayers", activeUsersData);
 };
 
 

@@ -6,6 +6,8 @@ import path from "path";
 import { Platform } from "../games/gameModel";
 import { ObjectId } from "mongodb";
 import { sessionManager } from "../session/sessionManager";
+import { redisClient } from "../../config/redis";
+import { NewEventType } from "../../utils/eventTypes";
 
 interface GameRequest extends Request {
   files?: {
@@ -67,10 +69,20 @@ class PayoutsController {
         throw createHttpError(404, "Platform or game not found");
       }
 
-      for (const [username, playerSocket] of sessionManager.getPlatformSessions()) {
-        const gameId = payoutFileName.split('_')[0];
-        if (playerSocket.currentGameData.gameId === gameId) {
-          playerSocket.currentGameData.currentGameManager.currentGameType.currentGame.initialize(payoutJSONData);
+      const updatePayload = {
+        tagName,
+        newVersion,
+        payoutData: payoutJSONData
+      };
+
+      const playgrounds = await redisClient.pubClient.keys("playground:*");
+
+      for (const playgroundKey of playgrounds) {
+        const username = playgroundKey.split(":")[1];
+        const playgroundSession = await redisClient.pubClient.hGetAll(playgroundKey);
+        if (playgroundSession.currentGame && JSON.parse(playgroundSession.currentGame).gameId === tagName) {
+          await redisClient.pubClient.publish(`player:${username}`, JSON.stringify({ type: NewEventType.UPDATE_PAYOUT, payload: updatePayload }));
+          console.log(`📢 Published NEW_GAME_VERSION event for ${tagName} to ${username}`);
         }
       }
 
@@ -240,8 +252,7 @@ class PayoutsController {
       );
 
       const targetPayoutId = payout._id.toString();
-
-      const currentUpdatedPayout = await Payouts.aggregate([
+      const updatedPayout = await Payouts.aggregate([
         { $match: { gameName: tagName } },
         { $unwind: "$content" },
         { $unwind: "$content.data" },
@@ -256,20 +267,22 @@ class PayoutsController {
         { $sort: { "content.createdAt": -1 } }
       ]);
 
+      if (!updatedPayout || updatedPayout.length === 0) {
+        throw createHttpError(404, "Payout data not found in database");
+      }
 
+      const newPayoutData = updatedPayout[0].content.data;
+      const playgrounds = await redisClient.pubClient.keys("playground:*");
 
-      const matchingPayout = currentUpdatedPayout.find(payout => payout.content._id.toString() === targetPayoutId);
-
-
-      for (const [username, playerSocket] of sessionManager.getPlatformSessions()) {
-        const gameId = tagName;
-        if (playerSocket.currentGameData.gameId === gameId) {
-          playerSocket.currentGameData.gameSettings
-
-
-          // initialize(matchingPayout.content.data)
+      for (const playgroundKey of playgrounds) {
+        const username = playgroundKey.split(":")[1];
+        const playgroundSession = await redisClient.pubClient.hGetAll(playgroundKey);
+        if (playgroundSession.currentGame && JSON.parse(playgroundSession.currentGame).gameId === tagName) {
+          await redisClient.pubClient.publish(`player:${username}`, JSON.stringify({ type: NewEventType.UPDATE_PAYOUT, payload: newPayoutData }));
+          console.log(`📢 Published NEW_GAME_VERSION event for ${tagName} to ${username}`);
         }
       }
+
 
       res.status(200).json({ message: "Game payout version updated" });
 

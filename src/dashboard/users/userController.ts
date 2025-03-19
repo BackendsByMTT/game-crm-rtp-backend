@@ -536,10 +536,7 @@ export class UserController {
 
   async getAllPlayers(req: Request, res: Response, next: NextFunction) {
     try {
-      const activePlayers = new Set();
-      sessionManager.getPlatformSessions().forEach((value, key) => {
-        activePlayers.add({ username: key, currentGame: value.currentGameData.gameId });
-      });
+
 
       const _req = req as AuthRequest;
       const { username: currentUsername, role: currentUserRole } = _req.user;
@@ -582,7 +579,7 @@ export class UserController {
       }
 
       let query: any = {
-        username: { $in: Array.from(activePlayers).map((player: ActivePlayer) => player.username) },
+
       };
 
       // Handle date range filtering
@@ -678,20 +675,12 @@ export class UserController {
 
       const players = await PlayerModel.find(query).skip(skip).limit(limit);
 
-      const playersWithGameInfo = players.map(player => {
-        const activePlayer = Array.from(activePlayers).find((ap: ActivePlayer) => ap.username === player.username) as ActivePlayer | undefined;
-
-        return {
-          ...player.toObject(),
-          currentGame: activePlayer?.currentGame || 'inactive',
-        };
-      });
 
       res.status(200).json({
         totalSubordinates: playerCount,
         totalPages,
         currentPage: page,
-        subordinates: playersWithGameInfo,
+        subordinates: [],
       });
     } catch (error) {
       next(error);

@@ -135,25 +135,21 @@ export async function setupWebSocket(server: any, corsOptions: any) {
 
     });
 
-    // **Control Namespace (For Admins and Moderators)**
     namespaces.control.on("connection", async (socket) => {
-        const { username, role } = socket.data.user;
-        const { credits } = await getManagerDetails(username);
-        const userAgent = socket.handshake.headers["user-agent"];
+        try {
+            const { username, role } = socket.data.user;
+            const { credits } = await getManagerDetails(username);
+            const userAgent = socket.handshake.headers["user-agent"];
 
-        let existingManager = sessionManager.getActiveManagerByUsername(username);
-        if (existingManager) {
-            if (existingManager.socketData.reconnectionTimeout) {
-                clearTimeout(existingManager.socketData.reconnectionTimeout);
-            }
-            existingManager.initializeManager(socket);
-            socket.emit(messageType.ALERT, `Manager ${username} has been reconnected.`);
-        } else {
+            // **Create new manager instance**
             const newManager = new Manager(username, credits, role, userAgent, socket);
-            sessionManager.addManager(username, newManager)
             socket.emit(messageType.ALERT, `Manager ${username} has been connected.`);
-        }
 
+        } catch (error) {
+            console.error(`❌ Error handling manager connection:`, error);
+            socket.emit(messageType.ERROR, "Failed to establish connection");
+            socket.disconnect();
+        }
     });
 }
 

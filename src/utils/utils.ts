@@ -110,18 +110,19 @@ export const updateStatus = async (client: IUser | IPlayer, status: string) => {
     throw createHttpError(400, "Invalid status value");
   }
   client.status = status;
-  for (const [username, playerSocket] of sessionManager.getPlatformSessions()) {
-    if (playerSocket) {
-      const socketUser = await sessionManager.getPlaygroundSession(client.username)
-      if (socketUser) {
-        if (status === 'inactive') {
-          socketUser.forceExit();
-        }
-      } else {
-        console.warn(`User ${client.username} does not have a current game or settings.`);
-      }
-    }
-  }
+  // TODO: NEED TO CONSIDER THIS
+  // for (const [username, playerSocket] of sessionManager.getPlatformSessions()) {
+  //   if (playerSocket) {
+  //     const socketUser = await sessionManager.getPlaygroundSession(client.username)
+  //     if (socketUser) {
+  //       if (status === 'inactive') {
+  //         socketUser.forceExit();
+  //       }
+  //     } else {
+  //       console.warn(`User ${client.username} does not have a current game or settings.`);
+  //     }
+  //   }
+  // }
 };
 
 export const updatePassword = async (

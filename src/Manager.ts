@@ -86,18 +86,23 @@ export default class Manager {
     }
 
 
-    public initializeManager(socket: Socket) {
+    public async initializeManager(socket: Socket) {
         this.resetSocketData();
 
         this.socketData = {
             socket: socket,
             heartbeatInterval: setInterval(async () => {
                 if (this.socketData.socket) {
-                    const activePlayers = await sessionManager.getPlayersSummariesByManager(this.username, this.role);
-                    this.socketData.socket.emit("activePlayers", activePlayers);
-                    this.sendData({ type: "CREDITS", payload: { credits: this.credits, role: this.role, worker: process.pid } })
+                    // Fetch all players from Redis and send to the manager
+                    const allActivePlayers = await this.getAllPlaygroundPlayers();
+                    this.socketData.socket.emit(NewEventType.ALL_PLAYGROUND_PLAYERS, allActivePlayers);
+
+                    this.sendData({
+                        type: "CREDITS",
+                        payload: { credits: this.credits, role: this.role, worker: process.pid }
+                    });
                 }
-            }, 5000),
+            }, 5000), // Updates every 5 seconds
             reconnectionAttempts: 0,
             maxReconnectionAttempts: 3,
             reconnectionTimeout: null,
@@ -110,16 +115,19 @@ export default class Manager {
             console.log(`Manager ${this.username} disconnected`);
             this.handleDisconnection();
         });
+
+        await sessionManager.addControlUser(this);
         this.sendData({ type: "CREDITS", payload: { credits: this.credits, role: this.role } })
     }
 
-    private handleDisconnection() {
+    private async handleDisconnection() {
+
         clearInterval(this.socketData.heartbeatInterval); // Clear heartbeat on disconnect
         this.socketData.socket = null;
 
-        this.socketData.reconnectionTimeout = setTimeout(() => {
+        this.socketData.reconnectionTimeout = setTimeout(async () => {
             console.log(`Removing manager ${this.username} due to prolonged disconnection`);
-            sessionManager.deleteManagerByUsername(this.username)
+            await sessionManager.removeControlUser(this.username);
         }, 60000); // 1-minute timeout for reconnection
     }
 
@@ -222,6 +230,40 @@ export default class Manager {
         } catch (error) {
             console.error("Error retrieving player session data:", error);
             if (callback) callback({ success: false, message: "Error retrieving session data" });
+        }
+    }
+
+    private async getAllPlaygroundPlayers(): Promise<any[]> {
+        try {
+            const allPlayers: any[] = [];
+            const playgroundKeys = await redisClient.pubClient.keys("playground:*");
+
+            for (const playerKey of playgroundKeys) {
+                const playerData = await redisClient.pubClient.hGetAll(playerKey);
+
+                // Ensure playerData exists
+                if (Object.keys(playerData).length === 0) continue;
+
+                allPlayers.push({
+                    username: playerData.playerId,
+                    status: playerData.status,
+                    currentCredits: playerData.currentCredits ? parseFloat(playerData.currentCredits) : 0,
+                    platformId: playerData.platformId || null,
+                    managerName: playerData.managerName || null,
+                    entryTime: playerData.entryTime ? new Date(playerData.entryTime) : null,
+                    exitTime: playerData.exitTime && playerData.exitTime !== "null" ? new Date(playerData.exitTime) : null,
+                    currentRTP: playerData.currentRTP ? parseFloat(playerData.currentRTP) : 0,
+                    currentGame: playerData.currentGame && playerData.currentGame !== "null"
+                        ? JSON.parse(playerData.currentGame)
+                        : null,
+                    userAgent: playerData.userAgent || "Unknown",
+                });
+            }
+
+            return allPlayers;
+        } catch (error) {
+            console.error("❌ Error fetching all playground players from Redis:", error);
+            return [];
         }
     }
 
