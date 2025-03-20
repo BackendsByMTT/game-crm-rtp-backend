@@ -168,6 +168,7 @@ const handlePlayerConnection = (socket, decoded, userAgent) => __awaiter(void 0,
         socket.disconnect(true);
     }
 });
+;
 const handleManagerConnection = (socket, decoded, userAgent) => __awaiter(void 0, void 0, void 0, function* () {
 });
 const socketController = (io) => {

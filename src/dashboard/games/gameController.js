@@ -168,7 +168,7 @@ class GameController {
                     throw (0, http_errors_1.default)(403, "Account is inactive, please contact support");
                 }
                 // Check if the player has an active game session
-                if (playerSession.currentGameSession) {
+                if (playerSession.currentGameData && playerSession.currentGameData.socket && playerSession.currentGameData.socket.connected) {
                     console.log(`Player ${username} already has an active game: ${playerSession.currentGameData.gameId}`);
                     throw (0, http_errors_1.default)(403, "You already have an active game session. Please finish your current game first");
                 }

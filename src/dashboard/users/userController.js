@@ -140,7 +140,7 @@ class UserController {
                         $set: { lastLogin: new Date(), $inc: { loginTimes: 1 } }
                     });
                 }
-                const token = jsonwebtoken_1.default.sign({ id: user._id, username: user.username, role: user.role }, config_1.config.jwtSecret, { expiresIn: "1d" });
+                const token = jsonwebtoken_1.default.sign({ id: user._id, username: user.username, role: user.role }, config_1.config.jwtSecret, { expiresIn: "7d" });
                 // res.cookie("userToken", token, {
                 //   maxAge: 1000 * 60 * 60 * 24 * 7,
                 //   httpOnly: true,

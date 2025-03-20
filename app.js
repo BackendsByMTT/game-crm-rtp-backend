@@ -32,7 +32,6 @@ const sessionRoutes_1 = __importDefault(require("./src/dashboard/session/session
 const server_1 = require("./src/server");
 const db_1 = __importDefault(require("./src/config/db"));
 const globalHandler_1 = __importDefault(require("./src/dashboard/middleware/globalHandler"));
-const appRoute_1 = __importDefault(require("./src/dashboard/app/appRoute"));
 const app = (0, express_1.default)();
 // CORS for WebSockets and Express API
 const corsOptions = {
@@ -84,7 +83,6 @@ app.use("/api/games", gameRoutes_1.default);
 app.use("/api/payouts", checkUser_1.checkUser, (0, checkRole_1.checkRole)(["admin"]), payoutRoutes_1.default);
 app.use("/api/toggle", checkUser_1.checkUser, (0, checkRole_1.checkRole)(["admin"]), ToggleRoutes_1.default);
 app.use("/api/session", sessionRoutes_1.default);
-app.use("/api/app", appRoute_1.default);
 // Serve the HTML file for the frontend
 app.get('/', (req, res) => {
     res.sendFile('index.html', { root: './' });
