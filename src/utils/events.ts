@@ -14,6 +14,7 @@ export enum Events {
     PLAYGROUND_GAME_SPIN = "playground:game:spin",
     PLAYGROUND_GAME_UPDATE = "playground:game:update:payout",
     PLAYGROUND_ALL = "playground:all",
+    PLAYGROUND_UPDATE = "playground:update:status"
 }
 
 export const Channels = {

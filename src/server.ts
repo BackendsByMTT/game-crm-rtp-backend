@@ -98,26 +98,28 @@ export async function setupWebSocket(server: any, corsOptions: any) {
 
     // Control Namespace (For Managers)
     namespaces.control.on("connection", async (socket) => {
-        const { username } = socket.data.user;
+        const { username, role } = socket.data.user;
+        const userAgent = socket.handshake.headers["user-agent"];
 
-        // 🔍 Check if control user already exists in memory
-        // let existingManager = sessionManager.getControlUser(username);
-        // if (existingManager) {
-        //     console.log(`🔄 Restoring control session from memory for ${username}`);
-        //     existingManager.initializeControlSocket(socket);
-        //     return;
-        // }
+        // 🔍 Check if the manager already exists in memory
+        let existingManager = sessionManager.getControlUser(username);
+        if (existingManager) {
+            console.log(`🔄 Restoring control session from memory for ${username}`);
+            existingManager.initializeManagerSocket(socket);
+            return;
+        }
 
-        // // 🔍 Check Redis for existing control session
-        // const redisSession = await redisClient.pubClient.hGetAll(Channels.CONTROL(username));
-        // if (redisSession && Object.keys(redisSession).length > 0) {
-        //     console.log(`🔄 Restoring control session from Redis for ${username}`);
-        //     await sessionManager.restoreControlUserFromRedis(username, socket);
-        //     return;
-        // }
+        // 🔍 Check if manager session exists in Redis
+        const redisSession = await redisClient.pubClient.hGetAll(Channels.CONTROL(role, username));
+        if (redisSession && Object.keys(redisSession).length > 0) {
+            console.log(`🔄 Restoring control session from Redis for ${username}`);
+            const restoredManager = await sessionManager.restoreControlUserFromRedis(redisSession, socket);
+            if (restoredManager) return;
+        }
 
-        // // 🚀 Add new control user session
-        // await sessionManager.addControlUser(username, socket);
+        // 🚀 Create a new manager session
+        await sessionManager.addControlUser(username, role, socket);
+
     });
 }
 

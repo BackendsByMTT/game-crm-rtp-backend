@@ -52,6 +52,7 @@ export default class PlayerSocket {
   exitTime: Date | null = null;
   currentRTP: number = 0;
   currentGameSession: GameSession | null = null;
+  lastPing: Date = null;
 
 
   constructor(username: string, role: string, status: string, credits: number, userAgent: string, socket: Socket, managerName: string) {
@@ -137,6 +138,11 @@ export default class PlayerSocket {
       this.messageHandler(false);
       this.onExit();
 
+      this.platformData.socket.on('pong', () => {
+        this.lastPing = new Date(); // Update the last response time
+      });
+
+
       if (this.platformData.socket) {
         this.platformData.socket.on("disconnect", () => {
           this.handlePlatformDisconnection();
@@ -147,6 +153,8 @@ export default class PlayerSocket {
 
       // ✅ Restart the heartbeat every time a platform socket is initialized
       sessionManager.startSessionHeartbeat(this);
+
+      this.sendData({ type: Events.PLAYGROUND_CREDITS, payload: { credits: this.playerData.credits } }, "platform")
 
       // ✅ If the player was in a game, ensure the game socket is reinitialized
       if (this.currentGameData.gameId && !this.currentGameData.socket) {
@@ -449,6 +457,13 @@ export default class PlayerSocket {
   public async updatePlayerBalance(credit: number) {
     try {
       this.playerData.credits += credit;
+
+      await redisClient.pubClient.hSet(Channels.PLAYGROUND(this.playerData.username), {
+        "currentCredits": this.playerData.credits.toString()
+      });
+
+      this.sendData({ type: Events.PLAYGROUND_CREDITS, payload: { credits: this.playerData.credits } }, "platform");
+
       await this.updateDatabase();
     } catch (error) {
       console.error("Error updating credits in database:", error);
@@ -458,6 +473,13 @@ export default class PlayerSocket {
   public async deductPlayerBalance(currentBet: number) {
     this.checkPlayerBalance(currentBet);
     this.playerData.credits -= currentBet;
+
+    await redisClient.pubClient.hSet(Channels.PLAYGROUND(this.playerData.username), {
+      "currentCredits": this.playerData.credits.toString()
+    });
+
+    this.sendData({ type: Events.PLAYGROUND_CREDITS, payload: { credits: this.playerData.credits } }, "platform");
+
   }
 
 
