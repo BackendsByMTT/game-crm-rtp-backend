@@ -70,7 +70,7 @@ class SLONE {
             try {
                 //TODO:
                 const playerData = this.settings._winData.slotGame.getPlayerData();
-                const platformSession = yield sessionManager_1.sessionManager.getPlaygroundSession(playerData.username);
+                const platformSession = yield sessionManager_1.sessionManager.getPlaygroundUser(playerData.username);
                 // console.log('playerCredits', playerData.credits);
                 //NOTE: low balance
                 if (this.settings.currentBet > playerData.credits) {

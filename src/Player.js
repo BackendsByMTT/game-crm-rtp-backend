@@ -22,12 +22,13 @@ const GameManager_1 = __importDefault(require("./game/GameManager"));
 const http_errors_1 = __importDefault(require("http-errors"));
 const sessionManager_1 = require("./dashboard/session/sessionManager");
 const redis_1 = require("./config/redis");
-const eventTypes_1 = require("./utils/eventTypes");
+const events_1 = require("./utils/events");
 class PlayerSocket {
     constructor(username, role, status, credits, userAgent, socket, managerName) {
         this.exitTime = null;
         this.currentRTP = 0;
         this.currentGameSession = null;
+        this.lastPing = null;
         this.playerData = {
             username, role, credits, userAgent, status
         };
@@ -62,22 +63,22 @@ class PlayerSocket {
         this.subscribeToRedisEvents();
     }
     subscribeToRedisEvents() {
-        redis_1.redisClient.subClient.subscribe(`player:${this.playerData.username}`, (message) => {
+        redis_1.redisClient.subClient.subscribe(events_1.Channels.PLAYGROUND(this.playerData.username), (message) => {
             const data = JSON.parse(message);
             console.log(`🔄 Syncing player state for ${this.playerData.username}:`, data);
             switch (data.type) {
-                case "UPDATE_BALANCE":
+                case events_1.Events.PLAYGROUND_CREDITS:
                     this.playerData.credits = data.payload.credits;
-                    this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits } }, "platform");
+                    this.sendData({ type: events_1.Events.PLAYGROUND_CREDITS, data: { credits: this.playerData.credits } }, "platform");
                     break;
-                case eventTypes_1.NewEventType.UPDATE_PAYOUT:
+                case events_1.Events.PLAYGROUND_GAME_UPDATE:
                     if (this.currentGameData.gameId === data.payload.tagName) {
                         console.log(`🎮 Updating game settings for ${this.playerData.username}`);
-                        // Update game settings dynamically
                         this.currentGameData.gameSettings = data.payload.payoutData;
                         this.currentGameData.currentGameManager.currentGameType.currentGame.initialize(data.payload.payoutData);
                         this.sendAlert(`Game ${data.payload.tagName} updated to version ${data.payload.newVersion}`, true);
                     }
+                    break;
                 default:
                     console.log(`Unknown message type: ${data.type}`);
             }
@@ -93,6 +94,9 @@ class PlayerSocket {
                 this.platformData.platformId = socket.handshake.auth.platformId;
                 this.messageHandler(false);
                 this.onExit();
+                this.platformData.socket.on('pong', () => {
+                    this.lastPing = new Date(); // Update the last response time
+                });
                 if (this.platformData.socket) {
                     this.platformData.socket.on("disconnect", () => {
                         this.handlePlatformDisconnection();
@@ -101,10 +105,40 @@ class PlayerSocket {
                 else {
                     console.error("Socket is null during initialization of disconnect event");
                 }
-                yield sessionManager_1.sessionManager.startSession(this);
+                // ✅ Restart the heartbeat every time a platform socket is initialized
+                sessionManager_1.sessionManager.startSessionHeartbeat(this);
+                this.sendData({ type: events_1.Events.PLAYGROUND_CREDITS, payload: { credits: this.playerData.credits } }, "platform");
+                // ✅ If the player was in a game, ensure the game socket is reinitialized
+                if (this.currentGameData.gameId && !this.currentGameData.socket) {
+                    console.log(`🔄 Reinitializing game socket for ${this.playerData.username}`);
+                    this.initializeGameSocket(socket);
+                }
             }
             catch (error) {
                 console.error("Error initializing platform socket:", error);
+            }
+        });
+    }
+    handlePlatformDisconnection() {
+        if (process.env.NODE_ENV == "testing")
+            return;
+        this.attemptReconnection(this.platformData);
+    }
+    cleanupPlatformSocket() {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                yield sessionManager_1.sessionManager.endSession(this.playerData.username);
+                if (this.platformData.socket) {
+                    this.platformData.platformId = null;
+                    this.platformData.socket.disconnect(true);
+                    this.platformData.socket = null;
+                }
+                clearInterval(this.platformData.heartbeatInterval);
+                this.platformData.reconnectionAttempts = 0;
+                this.platformData.cleanedUp = true;
+            }
+            catch (error) {
+                console.error("Error cleaning up platform socket:");
             }
         });
     }
@@ -121,14 +155,7 @@ class PlayerSocket {
             this.onExit(true);
             this.messageHandler(true);
             this.currentGameData.socket.emit("socketState", true);
-            yield sessionManager_1.sessionManager.startGame(this);
         });
-    }
-    // Handle platform disconnection and reconnection
-    handlePlatformDisconnection() {
-        if (process.env.NODE_ENV == "testing")
-            return;
-        this.attemptReconnection(this.platformData);
     }
     // Handle game disconnection - immediately clean up without reconnection attempts
     handleGameDisconnection() {
@@ -140,28 +167,10 @@ class PlayerSocket {
     cleanupGameSocket() {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                yield sessionManager_1.sessionManager.endGame(this);
+                yield sessionManager_1.sessionManager.endGame(this.playerData.username);
             }
             catch (error) {
                 console.error(`❌ Error cleaning up game session for ${this.playerData.username}:`, error);
-            }
-        });
-    }
-    cleanupPlatformSocket() {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                yield sessionManager_1.sessionManager.endSession(this);
-                if (this.platformData.socket) {
-                    this.platformData.platformId = null;
-                    this.platformData.socket.disconnect(true);
-                    this.platformData.socket = null;
-                }
-                clearInterval(this.platformData.heartbeatInterval);
-                this.platformData.reconnectionAttempts = 0;
-                this.platformData.cleanedUp = true;
-            }
-            catch (error) {
-                console.error("Error cleaning up platform socket:");
             }
         });
     }
@@ -383,6 +392,10 @@ class PlayerSocket {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 this.playerData.credits += credit;
+                yield redis_1.redisClient.pubClient.hSet(events_1.Channels.PLAYGROUND(this.playerData.username), {
+                    "currentCredits": this.playerData.credits.toString()
+                });
+                this.sendData({ type: events_1.Events.PLAYGROUND_CREDITS, payload: { credits: this.playerData.credits } }, "platform");
                 yield this.updateDatabase();
             }
             catch (error) {
@@ -394,6 +407,10 @@ class PlayerSocket {
         return __awaiter(this, void 0, void 0, function* () {
             this.checkPlayerBalance(currentBet);
             this.playerData.credits -= currentBet;
+            yield redis_1.redisClient.pubClient.hSet(events_1.Channels.PLAYGROUND(this.playerData.username), {
+                "currentCredits": this.playerData.credits.toString()
+            });
+            this.sendData({ type: events_1.Events.PLAYGROUND_CREDITS, payload: { credits: this.playerData.credits } }, "platform");
         });
     }
     getSummary() {

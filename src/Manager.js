@@ -9,43 +9,67 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const userModel_1 = require("./dashboard/users/userModel");
 const sessionManager_1 = require("./dashboard/session/sessionManager");
 const sessionModel_1 = require("./dashboard/session/sessionModel");
 const redis_1 = require("./config/redis");
-const eventTypes_1 = require("./utils/eventTypes");
+const events_1 = require("./utils/events");
 class Manager {
     constructor(username, credits, role, userAgent, socket) {
         this.username = username;
         this.credits = credits;
         this.role = role;
         this.userAgent = userAgent;
-        this.initializeManager(socket);
+        this.initializeManagerSocket(socket);
         this.subscribeToRedisEvents();
     }
+    initializeManagerSocket(socket) {
+        return __awaiter(this, void 0, void 0, function* () {
+            this.resetSocketData();
+            this.socketData = {
+                socket: socket,
+                heartbeatInterval: setInterval(() => { }, 0),
+                reconnectionAttempts: 0,
+                maxReconnectionAttempts: 3,
+                reconnectionTimeout: null,
+                cleanedUp: false
+            };
+            this.initializeSocketHandler();
+            // ✅ Restart heartbeat when the manager reconnects
+            sessionManager_1.sessionManager.startControlHeartbeat(this);
+            // Handle disconnection logic
+            this.socketData.socket.on("disconnect", () => {
+                console.log(`Manager ${this.username} disconnected`);
+                this.handleDisconnection();
+            });
+        });
+    }
     subscribeToRedisEvents() {
-        redis_1.redisClient.subClient.subscribe(`control:${this.role}:${this.username}`, (message) => {
+        const channel = events_1.Channels.CONTROL(this.role, this.username);
+        redis_1.redisClient.subClient.subscribe(channel, (message) => {
             const data = JSON.parse(message);
             console.log(`🔄 Syncing state for ${this.username}:`, data);
             switch (data.type) {
-                case "UPDATE_BALANCE":
+                case events_1.Events.CONTROL_CREDITS:
                     this.credits = data.payload.credits;
-                    this.sendData({ type: "CREDIT", data: { credits: this.credits } });
+                    this.sendData({ type: events_1.Events.CONTROL_CREDITS, payload: this.credits });
                     break;
-                case eventTypes_1.NewEventType.PLAYGROUND_JOINED:
-                    this.socketData.socket.emit("PLATFORM", { type: "ENTERED_PLATFORM", payload: data.payload });
+                case events_1.Events.PLAYGROUND_ENTER:
+                    this.sendData({ type: events_1.Events.PLAYGROUND_ENTER, payload: data.payload });
                     break;
-                case eventTypes_1.NewEventType.PLAYGROUND_EXITED:
-                    this.socketData.socket.emit("PLATFORM", { type: "EXITED_PLATFORM", payload: data.payload });
+                case events_1.Events.PLAYGROUND_EXIT:
+                    this.sendData({ type: events_1.Events.PLAYGROUND_EXIT, payload: data.payload });
                     break;
-                case eventTypes_1.NewEventType.GAME_STARTED:
-                    this.socketData.socket.emit("PLATFORM", { type: "ENTERED_GAME", payload: data.payload });
+                case events_1.Events.PLAYGROUND_GAME_ENTER:
+                    this.sendData({ type: events_1.Events.PLAYGROUND_GAME_ENTER, payload: data.payload });
                     break;
-                case eventTypes_1.NewEventType.GAME_ENDED:
-                    this.socketData.socket.emit("PLATFORM", { type: "EXITED_GAME", payload: data.payload });
+                case events_1.Events.PLAYGROUND_GAME_EXIT:
+                    this.sendData({ type: events_1.Events.PLAYGROUND_GAME_EXIT, payload: data.payload });
                     break;
-                case eventTypes_1.NewEventType.UPDATE_SPIN:
-                    this.socketData.socket.emit("PLATFORM", { type: "UPDATE_SPIN", payload: data.payload });
+                case events_1.Events.PLAYGROUND_GAME_SPIN:
+                    this.sendData({ type: events_1.Events.PLAYGROUND_GAME_SPIN, payload: data.payload });
+                    break;
+                case events_1.Events.PLAYGROUND_ALL:
+                    this.handleGetAllPlayers();
                     break;
                 default:
                     console.log(`Unknown message type: ${data.type}`);
@@ -66,54 +90,27 @@ class Manager {
             this.socketData.socket = null;
         }
     }
-    initializeManager(socket) {
-        return __awaiter(this, void 0, void 0, function* () {
-            this.resetSocketData();
-            this.socketData = {
-                socket: socket,
-                heartbeatInterval: setInterval(() => __awaiter(this, void 0, void 0, function* () {
-                    if (this.socketData.socket) {
-                        // Fetch all players from Redis and send to the manager
-                        const allActivePlayers = yield this.getAllPlaygroundPlayers();
-                        this.socketData.socket.emit(eventTypes_1.NewEventType.ALL_PLAYGROUND_PLAYERS, allActivePlayers);
-                        this.sendData({
-                            type: "CREDITS",
-                            payload: { credits: this.credits, role: this.role, worker: process.pid }
-                        });
-                    }
-                }), 5000), // Updates every 5 seconds
-                reconnectionAttempts: 0,
-                maxReconnectionAttempts: 3,
-                reconnectionTimeout: null,
-                cleanedUp: false
-            };
-            this.initializeSocketHandler();
-            this.socketData.socket.on("disconnect", () => {
-                console.log(`Manager ${this.username} disconnected`);
-                this.handleDisconnection();
-            });
-            yield sessionManager_1.sessionManager.addControlUser(this);
-            this.sendData({ type: "CREDITS", payload: { credits: this.credits, role: this.role } });
-        });
-    }
     handleDisconnection() {
         return __awaiter(this, void 0, void 0, function* () {
-            clearInterval(this.socketData.heartbeatInterval); // Clear heartbeat on disconnect
+            // ❌ Stop the heartbeat when manager disconnects
+            sessionManager_1.sessionManager.stopControlHeartbeat(this);
+            clearInterval(this.socketData.heartbeatInterval);
             this.socketData.socket = null;
             this.socketData.reconnectionTimeout = setTimeout(() => __awaiter(this, void 0, void 0, function* () {
                 console.log(`Removing manager ${this.username} due to prolonged disconnection`);
-                yield sessionManager_1.sessionManager.removeControlUser(this.username);
-            }), 60000); // 1-minute timeout for reconnection
+                yield sessionManager_1.sessionManager.removeControlUser(this.username, this.role);
+            }), 60000);
         });
     }
+    // TODO: Check we are using this
     initializeSocketHandler() {
         if (this.socketData.socket) {
             this.socketData.socket.on("data", (message, callback) => __awaiter(this, void 0, void 0, function* () {
                 try {
                     const res = message;
                     switch (res.action) {
-                        case "PLAYER_STATUS":
-                            yield this.playerStatusHandler(res.payload, callback);
+                        case events_1.Events.PLAYGROUND_EXIT:
+                            yield this.forceRemovePlayer(res.payload.playerId, callback);
                             break;
                         case "PLAYER_SESSION":
                             yield this.playerSessionHandler(res.payload, callback);
@@ -136,44 +133,32 @@ class Manager {
             console.error(`Socket is not available for manager ${this.username}`);
         }
     }
-    playerStatusHandler(data, callback) {
+    forceRemovePlayer(playerId, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                // Attempt to retrieve the player document
-                const player = yield userModel_1.Player.findOne({ username: data.playerId });
-                if (!player) {
-                    console.log("Player not found:", data.playerId);
+                console.log(`🚨 Manager requested forceful removal of player: ${playerId}`);
+                const playerSession = sessionManager_1.sessionManager.getPlaygroundUser(playerId);
+                if (!playerSession) {
+                    console.warn(`⚠️ Player ${playerId} is not in an active session.`);
                     if (callback)
-                        callback({ success: false, message: "Player not found" });
+                        callback({ success: false, message: "Player not found or already removed" });
                     return;
                 }
-                // Attempt to update the status field
-                const updateResult = yield userModel_1.Player.updateOne({ username: data.playerId }, { $set: { status: data.status } });
-                // Check if the update was successful using modifiedCount
-                if (updateResult.modifiedCount === 0) {
-                    console.warn(`No document modified for player: ${data.playerId}`);
+                // 🚀 Notify the player on the frontend
+                playerSession.sendData({ type: events_1.Events.PLAYGROUND_EXIT, message: "You have been removed by the manager." }, "platform");
+                // ⏳ Wait a moment to allow the client to process the message
+                setTimeout(() => __awaiter(this, void 0, void 0, function* () {
+                    // ✅ Forcefully remove player session
+                    yield sessionManager_1.sessionManager.endSession(playerId);
+                    console.log(`✅ Player ${playerId} forcefully removed by manager.`);
                     if (callback)
-                        callback({ success: false, message: "No changes made to status" });
-                    return;
-                }
-                // Notify the player socket of the status change
-                const playerSocket = yield sessionManager_1.sessionManager.getPlaygroundSession(data.playerId);
-                if (playerSocket) {
-                    if (data.status === "inactive") {
-                        yield playerSocket.forceExit(false);
-                        console.log(`Player ${data.playerId} exited from platform due to inactivity`);
-                    }
-                    else {
-                        playerSocket.sendData({ type: "STATUS", data: { status: data.status } }, "platform");
-                    }
-                }
-                if (callback)
-                    callback({ success: true, message: "Status updated successfully" });
+                        callback({ success: true, message: "Player successfully removed" });
+                }), 500); // Delay to ensure message is received before disconnecting
             }
             catch (error) {
-                console.error("Error updating player status:", error);
+                console.error(`❌ Error forcefully removing player ${playerId}:`, error);
                 if (callback)
-                    callback({ success: false, message: "Error updating status" });
+                    callback({ success: false, message: "Error removing player" });
             }
         });
     }
@@ -199,29 +184,40 @@ class Manager {
             }
         });
     }
-    getAllPlaygroundPlayers() {
+    handleGetAllPlayers() {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const allPlayers = [];
-                const playgroundKeys = yield redis_1.redisClient.pubClient.keys("playground:*");
+                const playgroundKeys = yield redis_1.redisClient.pubClient.keys(events_1.Channels.PLAYGROUND("*"));
                 for (const playerKey of playgroundKeys) {
                     const playerData = yield redis_1.redisClient.pubClient.hGetAll(playerKey);
-                    // Ensure playerData exists
                     if (Object.keys(playerData).length === 0)
                         continue;
+                    let currentGame = null;
+                    if (playerData.currentGame && playerData.currentGame !== "null") {
+                        try {
+                            currentGame = JSON.parse(playerData.currentGame);
+                            // ✅ Ensure gameName is always defined
+                            if (!currentGame.gameName) {
+                                currentGame.gameName = "Unknown Game";
+                            }
+                        }
+                        catch (error) {
+                            console.error(`❌ Failed to parse currentGame for ${playerData.playerId}:`, error);
+                        }
+                    }
                     allPlayers.push({
-                        username: playerData.playerId,
+                        playerId: playerData.playerId,
                         status: playerData.status,
+                        initialCredits: playerData.initialCredits ? parseFloat(playerData.initialCredits) : 0,
                         currentCredits: playerData.currentCredits ? parseFloat(playerData.currentCredits) : 0,
-                        platformId: playerData.platformId || null,
                         managerName: playerData.managerName || null,
                         entryTime: playerData.entryTime ? new Date(playerData.entryTime) : null,
                         exitTime: playerData.exitTime && playerData.exitTime !== "null" ? new Date(playerData.exitTime) : null,
                         currentRTP: playerData.currentRTP ? parseFloat(playerData.currentRTP) : 0,
-                        currentGame: playerData.currentGame && playerData.currentGame !== "null"
-                            ? JSON.parse(playerData.currentGame)
-                            : null,
                         userAgent: playerData.userAgent || "Unknown",
+                        currentGame: currentGame,
+                        platformId: playerData.platformId || null,
                     });
                 }
                 return allPlayers;

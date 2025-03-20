@@ -146,7 +146,7 @@ class UserController {
                 //   httpOnly: true,
                 //   sameSite: "none",
                 // });
-                const socketUser = yield sessionManager_1.sessionManager.getPlaygroundSession(username);
+                const socketUser = yield sessionManager_1.sessionManager.getPlaygroundUser(username);
                 if (((_a = socketUser === null || socketUser === void 0 ? void 0 : socketUser.platformData.socket) === null || _a === void 0 ? void 0 : _a.connected) || (socketUser === null || socketUser === void 0 ? void 0 : socketUser.currentGameData.socket)) {
                     throw (0, http_errors_1.default)(403, "Already logged in on another browser or tab.");
                 }
@@ -174,7 +174,7 @@ class UserController {
                     throw (0, http_errors_1.default)(400, "Username is required");
                 }
                 // TODO: we have to change this according to redis
-                const platformSession = yield sessionManager_1.sessionManager.getPlaygroundSession(username);
+                const platformSession = yield sessionManager_1.sessionManager.getPlaygroundUser(username);
                 if (platformSession) {
                     yield platformSession.cleanupPlatformSocket();
                 }

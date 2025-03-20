@@ -46,7 +46,7 @@ app.use(express_1.default.json({ limit: '50mb' }));
 app.use(express_1.default.urlencoded({ extended: true, limit: '50mb' }));
 app.use((0, cors_1.default)(corsOptions));
 // Health check endpoint
-app.get('/health', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+app.get('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const healthInfo = {
         status: 'Healthy', // Professional yet clear
         uptime: `${Math.floor(process.uptime() / 60)} minutes`,
@@ -58,7 +58,8 @@ app.get('/health', (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         cpuLoad: {
             '1 min avg': os_1.default.loadavg()[0].toFixed(2),
             '5 min avg': os_1.default.loadavg()[1].toFixed(2),
-            '15 min avg': os_1.default.loadavg()[2].toFixed(2)
+            '15 min avg': os_1.default.loadavg()[2].toFixed(2),
+            cores: os_1.default.cpus().length
         },
         platform: {
             os: os_1.default.platform(),

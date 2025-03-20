@@ -18,7 +18,7 @@ const payoutModel_1 = __importDefault(require("./payoutModel"));
 const path_1 = __importDefault(require("path"));
 const gameModel_1 = require("../games/gameModel");
 const redis_1 = require("../../config/redis");
-const eventTypes_1 = require("../../utils/eventTypes");
+const events_1 = require("../../utils/events");
 class PayoutsController {
     uploadNewVersion(req, res, next) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -58,12 +58,12 @@ class PayoutsController {
                     newVersion,
                     payoutData: payoutJSONData
                 };
-                const playgrounds = yield redis_1.redisClient.pubClient.keys("playground:*");
+                const playgrounds = yield redis_1.redisClient.pubClient.keys(events_1.Channels.PLAYGROUND("*"));
                 for (const playgroundKey of playgrounds) {
                     const username = playgroundKey.split(":")[1];
                     const playgroundSession = yield redis_1.redisClient.pubClient.hGetAll(playgroundKey);
                     if (playgroundSession.currentGame && JSON.parse(playgroundSession.currentGame).gameId === tagName) {
-                        yield redis_1.redisClient.pubClient.publish(`player:${username}`, JSON.stringify({ type: eventTypes_1.NewEventType.UPDATE_PAYOUT, payload: updatePayload }));
+                        yield redis_1.redisClient.pubClient.publish(events_1.Channels.PLAYGROUND(username), JSON.stringify({ type: events_1.Events.PLAYGROUND_GAME_UPDATE, payload: updatePayload }));
                         console.log(`📢 Published NEW_GAME_VERSION event for ${tagName} to ${username}`);
                     }
                 }
@@ -214,12 +214,12 @@ class PayoutsController {
                     throw (0, http_errors_1.default)(404, "Payout data not found in database");
                 }
                 const newPayoutData = updatedPayout[0].content.data;
-                const playgrounds = yield redis_1.redisClient.pubClient.keys("playground:*");
+                const playgrounds = yield redis_1.redisClient.pubClient.keys(events_1.Channels.PLAYGROUND("*"));
                 for (const playgroundKey of playgrounds) {
                     const username = playgroundKey.split(":")[1];
                     const playgroundSession = yield redis_1.redisClient.pubClient.hGetAll(playgroundKey);
                     if (playgroundSession.currentGame && JSON.parse(playgroundSession.currentGame).gameId === tagName) {
-                        yield redis_1.redisClient.pubClient.publish(`player:${username}`, JSON.stringify({ type: eventTypes_1.NewEventType.UPDATE_PAYOUT, payload: newPayoutData }));
+                        yield redis_1.redisClient.pubClient.publish(events_1.Channels.PLAYGROUND(username), JSON.stringify({ type: events_1.Events.PLAYGROUND_GAME_UPDATE, payload: newPayoutData }));
                         console.log(`📢 Published NEW_GAME_VERSION event for ${tagName} to ${username}`);
                     }
                 }

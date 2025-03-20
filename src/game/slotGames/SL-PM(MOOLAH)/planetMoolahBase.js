@@ -72,7 +72,7 @@ class SLPM {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const playerData = this.getPlayerData();
-                const platformSession = yield sessionManager_1.sessionManager.getPlaygroundSession(playerData.username);
+                const platformSession = yield sessionManager_1.sessionManager.getPlaygroundUser(playerData.username);
                 if (this.settings.currentBet > playerData.credits) {
                     console.log(this.settings.currentBet + playerData.credits, 'dfdsfds');
                     this.sendError("Low Balance");

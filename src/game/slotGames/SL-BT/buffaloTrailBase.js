@@ -71,7 +71,7 @@ class SLBT {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const { username, credits } = this.getPlayerData();
-                const platformSession = yield sessionManager_1.sessionManager.getPlaygroundSession(username);
+                const platformSession = yield sessionManager_1.sessionManager.getPlaygroundUser(username);
                 if (this.settings.currentBet > credits)
                     return this.sendError("Low Balance");
                 const isFreeSpin = this.settings.freeSpin.freeSpinCount > 0;

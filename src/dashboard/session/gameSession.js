@@ -13,7 +13,7 @@ exports.GameSession = void 0;
 const uuid_1 = require("uuid");
 const events_1 = require("events");
 const gameModel_1 = require("../games/gameModel");
-const eventTypes_1 = require("../../utils/eventTypes");
+const events_2 = require("../../utils/events");
 class GameSession extends events_1.EventEmitter {
     constructor(playerId, gameId, creditsAtEntry) {
         super();
@@ -79,7 +79,7 @@ class GameSession extends events_1.EventEmitter {
             default:
                 spin[field] = value;
         }
-        this.emit(eventTypes_1.NewEventType.UPDATE_SPIN, this.getSummary());
+        this.emit(events_2.Events.PLAYGROUND_GAME_SPIN, this.getSummary());
         return true;
     }
     getSummary() {

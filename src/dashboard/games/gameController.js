@@ -32,7 +32,7 @@ const cloudinary_1 = __importDefault(require("cloudinary"));
 const config_1 = require("../../config/config");
 const payoutModel_1 = __importDefault(require("../payouts/payoutModel"));
 const path_1 = __importDefault(require("path"));
-const redis_1 = require("../../config/redis");
+const sessionManager_1 = require("../session/sessionManager");
 cloudinary_1.default.v2.config({
     cloud_name: config_1.config.cloud_name,
     api_key: config_1.config.api_key,
@@ -157,19 +157,19 @@ class GameController {
                 if (!slug) {
                     throw (0, http_errors_1.default)(400, "Slug parameter is required");
                 }
-                const playerSession = yield redis_1.redisClient.pubClient.hGetAll(`playground:${username}`);
-                if (!playerSession || Object.keys(playerSession).length === 0) {
-                    console.log(`❌ No active Redis session found for player ${username}`);
+                const playerSession = yield sessionManager_1.sessionManager.getPlaygroundUser(username);
+                if (!playerSession) {
+                    console.log(`❌ No active session found for player ${username}`);
                     throw (0, http_errors_1.default)(403, "No active session found. Please reconnect to the platform");
                 }
                 // Ensure player is active
-                if (playerSession.status !== "active") {
+                if (playerSession.playerData.status !== "active") {
                     console.log(`Player ${username} is inactive`);
                     throw (0, http_errors_1.default)(403, "Account is inactive, please contact support");
                 }
                 // Check if the player has an active game session
-                if (playerSession.currentGame !== "null") {
-                    console.log(`Player ${username} already has an active game: ${playerSession.currentGame}`);
+                if (playerSession.currentGameSession) {
+                    console.log(`Player ${username} already has an active game: ${playerSession.currentGameData.gameId}`);
                     throw (0, http_errors_1.default)(403, "You already have an active game session. Please finish your current game first");
                 }
                 const platform = yield gameModel_1.Platform.aggregate([

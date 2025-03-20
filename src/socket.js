@@ -68,7 +68,7 @@ const handlePlayerConnection = (socket, decoded, userAgent) => __awaiter(void 0,
         console.log(`Platform ID: ${platformId}, Origin: ${origin}, Game ID: ${gameId}`);
         const { credits, status, managerName } = yield getPlayerDetails(username);
         console.log(`Player details - Credits: ${credits}, Status: ${status}, Manager Name: ${managerName}`);
-        let existingPlayer = yield sessionManager_1.sessionManager.getPlaygroundSession(username);
+        let existingPlayer = yield sessionManager_1.sessionManager.getPlaygroundUser(username);
         console.log(`Existing player: ${existingPlayer ? 'Yes' : 'No'}`);
         if (existingPlayer) {
             // Platform connection handling

@@ -22,7 +22,7 @@ class TransactionService {
     createTransaction(type, manager, client, amount, session) {
         return __awaiter(this, void 0, void 0, function* () {
             // Check if the client is currently in a game via socket connection
-            const socketUser = yield sessionManager_1.sessionManager.getPlaygroundSession(client.username);
+            const socketUser = yield sessionManager_1.sessionManager.getPlaygroundUser(client.username);
             if (socketUser === null || socketUser === void 0 ? void 0 : socketUser.currentGameData.socket) {
                 throw (0, http_errors_1.default)(403, "The client must exit their current game session before initiating a transaction.");
             }
