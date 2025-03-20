@@ -67,7 +67,7 @@ export class SLSR {
         this.settings.BetPerLines = this.settings.currentGamedata.bets[data.currentBet];
         this.settings.currentBet = this.settings.BetPerLines * this.settings.currentLines;
     }
-
+    
 
     public async spinResult(): Promise<void> {
         try {
