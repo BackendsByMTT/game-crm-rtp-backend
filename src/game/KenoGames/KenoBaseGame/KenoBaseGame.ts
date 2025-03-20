@@ -160,11 +160,11 @@ export default class KenoBaseGame implements RequiredSocketMethods {
       this.playerData.totalBet = precisionRound(this.playerData.totalBet + currentBet, 5);
 
       const spinId = platformSession.currentGameSession.createSpin();
-      platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
+      await platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
 
       checkForWin(this);
       const winAmount = this.playerData.currentWinning;
-      platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', winAmount);
+      await platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', winAmount);
     } catch (error) {
       this.sendError("Spin error");
       console.error("Failed to generate spin results:", error);

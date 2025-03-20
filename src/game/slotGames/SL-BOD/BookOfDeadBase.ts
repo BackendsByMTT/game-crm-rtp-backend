@@ -130,12 +130,12 @@ export class SLBOD {
 
 
       const spinId = platformSession.currentGameSession.createSpin();
-      platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
+      await platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
 
       new RandomResultGenerator(this);
       checkForWin(this)
       const winAmount = this.playerData.currentWining;
-      platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', winAmount);
+      await platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', winAmount);
       //clear json
       this.settings.resultSymbolMatrix = [];
       this.settings._winData.winningLines = [];

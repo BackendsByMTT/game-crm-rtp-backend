@@ -98,7 +98,7 @@ export class SLBB {
       }
 
       const spinId = platformSession.currentGameSession.createSpin();
-      platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
+      await platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
 
       if (!(this.settings.bonus.count > 0)) {
         new RandomResultGenerator(this);
@@ -106,13 +106,13 @@ export class SLBB {
       checkForWin(this)
 
       const totalWinAmount = this.playerData.currentWining;
-      platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', totalWinAmount);
+      await platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', totalWinAmount);
 
       const jackpotAmount = this.settings._winData.specialFeatures.jackpot.amountWon || 0;
       const scatterAmount = this.settings._winData.specialFeatures.scatter.amountWon || 0;
       const bonusAmount = this.settings._winData.specialFeatures.bonus.amountWon || 0;
 
-      platformSession.currentGameSession.updateSpinField(spinId, "specialFeatures", {
+      await platformSession.currentGameSession.updateSpinField(spinId, "specialFeatures", {
         jackpot: { amountWon: jackpotAmount },
         scatter: { amountWon: scatterAmount },
         bonus: { amountWon: bonusAmount },

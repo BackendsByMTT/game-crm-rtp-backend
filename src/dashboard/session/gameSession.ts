@@ -2,7 +2,8 @@ import { v4 as uuidv4 } from "uuid";
 import { EventEmitter } from "events";
 import { ISpecialFeatures, ISpinData } from "./sessionTypes";
 import { Platform } from "../games/gameModel";
-import { Events } from "../../utils/events";
+import { Channels, Events } from "../../utils/events";
+import { redisClient } from "../../config/redis";
 
 export class GameSession extends EventEmitter {
     playerId: string;
@@ -44,7 +45,7 @@ export class GameSession extends EventEmitter {
         return spinId;
     }
 
-    public updateSpinField<T extends keyof ISpinData>(spinId: string, field: T, value: ISpinData[T]): boolean {
+    public async updateSpinField<T extends keyof ISpinData>(spinId: string, field: T, value: ISpinData[T]): Promise<boolean> {
         const spin = this.getSpinById(spinId);
         if (!spin) return false;
 
@@ -76,6 +77,10 @@ export class GameSession extends EventEmitter {
                 spin[field] = value;
         }
 
+        // 🔄 Update Redis with the latest game session state
+        await redisClient.pubClient.hSet(Channels.PLAYGROUND(this.playerId), {
+            "currentGame": JSON.stringify(this.getSummary())
+        });
         this.emit(Events.PLAYGROUND_GAME_SPIN, this.getSummary());
         return true;
     }

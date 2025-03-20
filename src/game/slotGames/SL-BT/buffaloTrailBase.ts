@@ -84,11 +84,11 @@ export class SLBT {
                 this.playerData.totalbet += this.settings.currentBet;
             }
             const spinId = platformSession.currentGameSession.createSpin();
-            platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
+            await platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
             await new RandomResultGenerator(this);
             checkForWin(this);
             this.settings.freeSpin.useFreeSpin = this.settings.freeSpin.freeSpinCount > 0;
-            platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', this.playerData.currentWining);
+            await platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', this.playerData.currentWining);
         } catch (error) {
             console.error("Failed to generate spin results:", error);
             this.sendError("Spin error");
