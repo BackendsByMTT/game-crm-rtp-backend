@@ -80,16 +80,16 @@ export async function setupWebSocket(server: any, corsOptions: any) {
         const gameId = socket.handshake.auth.gameId;
 
         // 🔍 Ensure player is connected to the Playground first
-        let existingSession = await sessionManager.getPlaygroundUser(username);
-        if (!existingSession || !existingSession.platformData?.socket.connected) {
-            return disconnectWithError(socket, "You must be connected to the Playground first.");
-        }
+        // let existingSession = await sessionManager.getPlaygroundUser(username);
+        // if (!existingSession || !existingSession.platformData?.socket.connected) {
+        //     return disconnectWithError(socket, "You must be connected to the Playground first.");
+        // }
 
-        // 🔍 Check if player is already in a game
-        if (existingSession.currentGameSession) {
-            console.log(`⚠️ Player ${username} is already in a game: ${existingSession.currentGameData.gameId}`);
-            return disconnectWithError(socket, "You are already playing a game. Finish your current session first.");
-        }
+        // // 🔍 Check if player is already in a game
+        // if (existingSession.currentGameSession) {
+        //     console.log(`⚠️ Player ${username} is already in a game: ${existingSession.currentGameData.gameId}`);
+        //     return disconnectWithError(socket, "You are already playing a game. Finish your current session first.");
+        // }
 
         // 🚀 Start game session
         console.log(`🎰 Player ${username} entering game: ${gameId}`);

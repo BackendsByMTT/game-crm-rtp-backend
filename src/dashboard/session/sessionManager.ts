@@ -136,28 +136,6 @@ class SessionManager {
             player.currentRTP = parseFloat(sessionData.currentRTP);
             player.platformData.platformId = sessionData.platformId;
 
-            // ✅ Restore game session if the player was in a game
-            if (sessionData.currentGame && sessionData.currentGame !== "null") {
-                try {
-                    const gameData = JSON.parse(sessionData.currentGame);
-                    player.currentGameData.gameId = gameData.gameId;
-                    player.currentGameData.gameSettings = gameData.gameSettings;
-                    player.currentGameData.currentGameManager = new GameManager(player.currentGameData);
-
-                    // ✅ Restore the GameSession instance
-                    player.currentGameSession = new GameSession(
-                        sessionData.playerId,
-                        gameData.gameId,
-                        parseFloat(sessionData.currentCredits)
-                    );
-
-                    player.currentGameSession.gameName = gameData.gameName || "Unknown Game";
-
-                } catch (error) {
-                    console.error(`❌ Failed to parse currentGame for ${sessionData.playerId}:`, error);
-                }
-            }
-
             // ✅ Store restored player in memory
             this.playground.set(sessionData.playerId, player);
 
@@ -249,13 +227,21 @@ class SessionManager {
         }
     };
 
-    private cleanupStaleSessions = async () => {
+    private async cleanupStaleSessions() {
         try {
             const keys = await redisClient.pubClient.keys(`${Channels.PLAYGROUND('*')}`);
             for (const key of keys) {
                 const ttl = await redisClient.pubClient.ttl(key);
+
                 if (ttl === -2) { // Key does not exist
                     const username = key.split(':')[1];
+
+                    // 🔍 Ensure the player is truly inactive before removing
+                    if (this.playground.has(username)) {
+                        console.warn(`⚠️ Prevented premature cleanup for active player: ${username}`);
+                        continue;
+                    }
+
                     this.playground.delete(username);
                     console.log(`🧹 Cleaned up stale session for ${username}`);
                 }
@@ -263,7 +249,7 @@ class SessionManager {
         } catch (error) {
             console.error("Error cleaning up stale sessions:", error);
         }
-    };
+    }
 
 
     // GAME
@@ -299,6 +285,8 @@ class SessionManager {
             });
 
             // ✅ Store the game session in Redis
+            console.log("SYMNMN : ", player.currentGameSession.getSummary())
+
             await redisClient.pubClient.hSet(Channels.PLAYGROUND(username), {
                 "currentGame": JSON.stringify(player.currentGameSession.getSummary())
             });
@@ -324,20 +312,47 @@ class SessionManager {
 
             console.log(`🚨 Ending game for ${username}: ${player.currentGameSession.gameId}`);
 
+            // 🛑 Ensure game session data is valid before updating DB
+            if (player.currentGameSession) {
+                player.currentGameSession.exitTime = new Date();
+                player.currentGameSession.creditsAtExit = player.playerData.credits;
+                player.currentGameSession.sessionDuration = Math.abs(
+                    player.currentGameSession.exitTime.getTime() - player.currentGameSession.entryTime.getTime()
+                );
 
-            player.currentGameSession.exitTime = new Date();
-            player.currentGameSession.creditsAtExit = player.playerData.credits;
-            player.currentGameSession.sessionDuration = Math.abs(
-                player.currentGameSession.exitTime.getTime() - player.currentGameSession.entryTime.getTime()
-            );
+                // 🗑️ Remove from Redis
+                await redisClient.pubClient.hDel(Channels.PLAYGROUND(username), "currentGame");
+
+                // 📝 Store game session in MongoDB
+                await PlatformSessionModel.updateOne(
+                    { playerId: player.playerData.username, entryTime: player.entryTime },
+                    {
+                        $push: { gameSessions: player.currentGameSession.getSummary() },
+                        $set: { currentRTP: player.currentRTP }
+                    }
+                );
+            }
+
+            // 🧹 Clear `currentGameData`
+            player.currentGameData = {
+                username: player.playerData.username,
+                gameId: null,
+                gameSettings: null,
+                currentGameManager: null,
+                session: null,
+                socket: null,
+                heartbeatInterval: setInterval(() => { }, 0),
+
+                sendMessage: player.sendMessage.bind(player),
+                sendError: player.sendError.bind(player),
+                sendAlert: player.sendAlert.bind(player),
+                updatePlayerBalance: player.updatePlayerBalance.bind(player),
+                deductPlayerBalance: player.deductPlayerBalance.bind(player),
+                getPlayerData: () => player.playerData,
+            };
+
+            // 🔄 Reset current game session
             player.currentGameSession = null;
-
-            await redisClient.pubClient.hDel(Channels.PLAYGROUND(username), "currentGame");
-
-            await PlatformSessionModel.updateOne(
-                { playerId: player.playerData.username, entryTime: player.entryTime },
-                { $push: { gameSessions: player.currentGameSession?.getSummary() }, $set: { currentRTP: player.currentRTP } }
-            );
 
             await this.notify(player.playerData.username, Events.PLAYGROUND_GAME_EXIT, username);
             console.log(`✅ Successfully ended game session for ${username}`);
@@ -345,7 +360,7 @@ class SessionManager {
         } catch (error) {
             console.error(`❌ Failed to end game session for player: ${username}`, error);
         }
-    }
+    };
 
 
     // CONTROL

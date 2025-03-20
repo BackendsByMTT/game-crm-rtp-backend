@@ -27,18 +27,8 @@ export class GameSession extends EventEmitter {
         this.sessionId = this.generateSessionId();
         this.entryTime = new Date();
         this.creditsAtEntry = creditsAtEntry;
-        this.gameName = ""; // Initialize gameName
-        this.initializeGameName();
     }
 
-    private async initializeGameName() {
-        try {
-            this.gameName = await this.getGameNameByTagName(this.gameId);
-        } catch (error) {
-            console.error("Error fetching game name:", error);
-            this.gameName = "Unknown Game";
-        }
-    }
 
     private generateSessionId(): string {
         return `${this.playerId}-${this.gameId}-${Date.now()}`;
@@ -113,18 +103,5 @@ export class GameSession extends EventEmitter {
         return this.spinData.find((spin) => spin.spinId === spinId);
     }
 
-    async getGameNameByTagName(tagName: string): Promise<string | null> {
-        const platform = await Platform.aggregate([
-            { $unwind: "$games" },
-            { $match: { "games.tagName": tagName } },
-            { $project: { _id: 0, gameName: "$games.name" } },
-            { $limit: 1 }
-        ]);
 
-        if (platform.length === 0) {
-            return null;
-        }
-
-        return platform[0].gameName;
-    }
 }

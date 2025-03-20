@@ -191,10 +191,7 @@ export default class PlayerSocket {
   }
 
   private async initializeGameSocket(socket: Socket) {
-
-    if (this.currentGameData.socket) {
-      this.cleanupGameSocket();
-    }
+    console.log("INITAILZES GAME SOCKET : ", socket.connected)
 
     this.currentGameData.socket = socket;
     this.currentGameData.gameId = socket.handshake.auth.gameId;
@@ -204,6 +201,8 @@ export default class PlayerSocket {
     this.onExit(true)
     this.messageHandler(true);
     this.currentGameData.socket.emit("socketState", true);
+
+    console.log("INIAILIZED : INITALITZED PROPELRY ")
   }
 
 
@@ -268,33 +267,6 @@ export default class PlayerSocket {
   }
 
   public async updateGameSocket(socket: Socket) {
-    if (!this.platformData.socket || !this.platformData.socket.connected) {
-      console.log("Game connection blocked - platform connection missing.");
-      socket.emit(messageType.ERROR, "Platform connection required.");
-      socket.disconnect(true);
-      throw createHttpError(403, "Platform connection required before joining a game.");
-    }
-    const MOBILE_USER_AGENT_REGEX = /android|iphone|ipad|ipod|mobile|okhttp/i;
-    const isMobile = this.playerData.userAgent ? MOBILE_USER_AGENT_REGEX.test(this.playerData.userAgent) : false;
-
-    // Skip user-agent validation in the testing environment
-    if (process.env.NODE_ENV !== "testing") {
-      if (!isMobile && (socket.request.headers["user-agent"] !== this.playerData.userAgent)) {
-        socket.emit("alert", {
-          id: "AnotherDevice",
-          message: "You are already playing on another browser",
-        });
-        socket.disconnect(true);
-        throw createHttpError(403, "You are already playing on another browser");
-      }
-    } else {
-      console.log("Testing environment detected. Skipping user-agent validation.");
-    }
-    socket.emit(messageType.ALERT, "Initializing game socket connection.");
-
-    // Delay-based retry to ensure platform stability
-    await new Promise(resolve => setTimeout(resolve, 500));
-
     console.log("Initializing game socket connection after platform stability confirmed.");
 
     this.initializeGameSocket(socket);
