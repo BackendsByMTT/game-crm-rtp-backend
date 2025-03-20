@@ -47,6 +47,10 @@ export default class Manager {
         // ✅ Restart heartbeat when the manager reconnects
         sessionManager.startControlHeartbeat(this);
 
+        // ✅ Send all active players when the manager first connects
+        const allPlayers = await this.handleGetAllPlayers();
+        this.sendData({ type: Events.PLAYGROUND_ALL, payload: allPlayers });
+
         // Handle disconnection logic
         this.socketData.socket.on("disconnect", () => {
             console.log(`Manager ${this.username} disconnected`);
