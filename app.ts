@@ -18,6 +18,7 @@ import sessionRoutes from './src/dashboard/session/sessionRoutes';
 import { setupWebSocket } from './src/server';
 import connectDB from './src/config/db';
 import globalErrorHandler from './src/dashboard/middleware/globalHandler';
+import appRouter from './src/dashboard/app/appRoute';
 
 
 const app = express();
@@ -79,6 +80,7 @@ app.use("/api/games", gameRoutes);
 app.use("/api/payouts", checkUser, checkRole(["admin"]), payoutRoutes);
 app.use("/api/toggle", checkUser, checkRole(["admin"]), toggleRoutes);
 app.use("/api/session", sessionRoutes);
+app.use("/api/app", appRouter);
 
 // Serve the HTML file for the frontend
 app.get('/', (req, res) => {
