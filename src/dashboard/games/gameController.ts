@@ -182,7 +182,7 @@ export class GameController {
       }
 
       // Check if the player has an active game session
-      if (playerSession.currentGameSession) {
+      if (playerSession.currentGameData.socket.connected) {
         console.log(`Player ${username} already has an active game: ${playerSession.currentGameData.gameId}`);
         throw createHttpError(403, "You already have an active game session. Please finish your current game first");
       }
