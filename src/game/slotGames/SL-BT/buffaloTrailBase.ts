@@ -72,7 +72,7 @@ export class SLBT {
     public async spinResult(): Promise<void> {
         try {
             const { username, credits } = this.getPlayerData();
-            const platformSession = await sessionManager.getPlaygroundSession(username);
+            const platformSession = await sessionManager.getPlaygroundUser(username);
             if (this.settings.currentBet > credits) return this.sendError("Low Balance");
             const isFreeSpin = this.settings.freeSpin.freeSpinCount > 0;
             if (isFreeSpin) {

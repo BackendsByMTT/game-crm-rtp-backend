@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from "uuid";
 import { EventEmitter } from "events";
 import { ISpecialFeatures, ISpinData } from "./sessionTypes";
 import { Platform } from "../games/gameModel";
-import { NewEventType } from "../../utils/eventTypes";
+import { Events } from "../../utils/events";
 
 export class GameSession extends EventEmitter {
     playerId: string;
@@ -86,7 +86,7 @@ export class GameSession extends EventEmitter {
                 spin[field] = value;
         }
 
-        this.emit(NewEventType.UPDATE_SPIN, this.getSummary());
+        this.emit(Events.PLAYGROUND_GAME_SPIN, this.getSummary());
         return true;
     }
 

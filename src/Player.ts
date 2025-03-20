@@ -12,7 +12,7 @@ import { socketConnectionData } from "./utils/utils";
 import { sessionManager } from "./dashboard/session/sessionManager";
 import { GameSession } from "./dashboard/session/gameSession";
 import { redisClient } from "./config/redis";
-import { NewEventType } from "./utils/eventTypes";
+import { Channels, Events } from "./utils/events";
 
 
 export interface currentGamedata {
@@ -52,6 +52,7 @@ export default class PlayerSocket {
   exitTime: Date | null = null;
   currentRTP: number = 0;
   currentGameSession: GameSession | null = null;
+  lastPing: Date = null;
 
 
   constructor(username: string, role: string, status: string, credits: number, userAgent: string, socket: Socket, managerName: string) {
@@ -96,41 +97,39 @@ export default class PlayerSocket {
     this.subscribeToRedisEvents();
   }
 
-  private subscribeToRedisEvents() {
-    redisClient.subClient.subscribe(`player:${this.playerData.username}`, (message) => {
+  public subscribeToRedisEvents() {
+    redisClient.subClient.subscribe(Channels.PLAYGROUND(this.playerData.username), (message) => {
       const data = JSON.parse(message);
       console.log(`🔄 Syncing player state for ${this.playerData.username}:`, data);
 
       switch (data.type) {
-        case "UPDATE_BALANCE":
+        case Events.PLAYGROUND_CREDITS:
           this.playerData.credits = data.payload.credits;
-          this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits } }, "platform");
+          this.sendData({ type: Events.PLAYGROUND_CREDITS, data: { credits: this.playerData.credits } }, "platform");
           break;
 
-        case NewEventType.UPDATE_PAYOUT:
+        case Events.PLAYGROUND_GAME_UPDATE:
           if (this.currentGameData.gameId === data.payload.tagName) {
             console.log(`🎮 Updating game settings for ${this.playerData.username}`);
 
-            // Update game settings dynamically
             this.currentGameData.gameSettings = data.payload.payoutData;
             this.currentGameData.currentGameManager.currentGameType.currentGame.initialize(data.payload.payoutData);
 
             this.sendAlert(`Game ${data.payload.tagName} updated to version ${data.payload.newVersion}`, true);
           }
-
-
+          break;
 
         default:
           console.log(`Unknown message type: ${data.type}`);
       }
-    })
+    });
   }
 
 
   public async initializePlatformSocket(socket: Socket) {
     try {
       if (this.currentGameData.socket) {
-        await this.cleanupGameSocket()
+        await this.cleanupGameSocket();
       }
 
       this.platformData.socket = socket;
@@ -139,17 +138,55 @@ export default class PlayerSocket {
       this.messageHandler(false);
       this.onExit();
 
+      this.platformData.socket.on('pong', () => {
+        this.lastPing = new Date(); // Update the last response time
+      });
+
+
       if (this.platformData.socket) {
         this.platformData.socket.on("disconnect", () => {
-          this.handlePlatformDisconnection()
-        })
+          this.handlePlatformDisconnection();
+        });
       } else {
         console.error("Socket is null during initialization of disconnect event");
       }
 
-      await sessionManager.startSession(this);
+      // ✅ Restart the heartbeat every time a platform socket is initialized
+      sessionManager.startSessionHeartbeat(this);
+
+      this.sendData({ type: Events.PLAYGROUND_CREDITS, payload: { credits: this.playerData.credits } }, "platform")
+
+      // ✅ If the player was in a game, ensure the game socket is reinitialized
+      if (this.currentGameData.gameId && !this.currentGameData.socket) {
+        console.log(`🔄 Reinitializing game socket for ${this.playerData.username}`);
+        this.initializeGameSocket(socket);
+      }
     } catch (error) {
       console.error("Error initializing platform socket:", error);
+    }
+  }
+
+  private handlePlatformDisconnection() {
+    if (process.env.NODE_ENV == "testing") return;
+    this.attemptReconnection(this.platformData)
+  }
+
+  public async cleanupPlatformSocket() {
+    try {
+      await sessionManager.endSession(this.playerData.username);
+
+      if (this.platformData.socket) {
+        this.platformData.platformId = null;
+        this.platformData.socket.disconnect(true);
+        this.platformData.socket = null;
+      }
+
+      clearInterval(this.platformData.heartbeatInterval);
+      this.platformData.reconnectionAttempts = 0;
+      this.platformData.cleanedUp = true;
+
+    } catch (error) {
+      console.error("Error cleaning up platform socket:")
     }
   }
 
@@ -167,15 +204,9 @@ export default class PlayerSocket {
     this.onExit(true)
     this.messageHandler(true);
     this.currentGameData.socket.emit("socketState", true);
-
-    await sessionManager.startGame(this);
   }
 
-  // Handle platform disconnection and reconnection
-  private handlePlatformDisconnection() {
-    if (process.env.NODE_ENV == "testing") return;
-    this.attemptReconnection(this.platformData)
-  }
+
 
   // Handle game disconnection - immediately clean up without reconnection attempts
   private handleGameDisconnection() {
@@ -186,30 +217,13 @@ export default class PlayerSocket {
   // Cleanup only the game socket
   private async cleanupGameSocket() {
     try {
-      await sessionManager.endGame(this);
+      await sessionManager.endGame(this.playerData.username);
     } catch (error) {
       console.error(`❌ Error cleaning up game session for ${this.playerData.username}:`, error);
     }
   }
 
-  public async cleanupPlatformSocket() {
-    try {
-      await sessionManager.endSession(this);
 
-      if (this.platformData.socket) {
-        this.platformData.platformId = null;
-        this.platformData.socket.disconnect(true);
-        this.platformData.socket = null;
-      }
-
-      clearInterval(this.platformData.heartbeatInterval);
-      this.platformData.reconnectionAttempts = 0;
-      this.platformData.cleanedUp = true;
-
-    } catch (error) {
-      console.error("Error cleaning up platform socket:")
-    }
-  }
 
   // Attempt reconnection  for platform or game socket based on provided data
   private async attemptReconnection(socketData: socketConnectionData) {
@@ -443,6 +457,13 @@ export default class PlayerSocket {
   public async updatePlayerBalance(credit: number) {
     try {
       this.playerData.credits += credit;
+
+      await redisClient.pubClient.hSet(Channels.PLAYGROUND(this.playerData.username), {
+        "currentCredits": this.playerData.credits.toString()
+      });
+
+      this.sendData({ type: Events.PLAYGROUND_CREDITS, payload: { credits: this.playerData.credits } }, "platform");
+
       await this.updateDatabase();
     } catch (error) {
       console.error("Error updating credits in database:", error);
@@ -452,6 +473,13 @@ export default class PlayerSocket {
   public async deductPlayerBalance(currentBet: number) {
     this.checkPlayerBalance(currentBet);
     this.playerData.credits -= currentBet;
+
+    await redisClient.pubClient.hSet(Channels.PLAYGROUND(this.playerData.username), {
+      "currentCredits": this.playerData.credits.toString()
+    });
+
+    this.sendData({ type: Events.PLAYGROUND_CREDITS, payload: { credits: this.playerData.credits } }, "platform");
+
   }
 
 

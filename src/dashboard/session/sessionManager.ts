@@ -2,145 +2,471 @@ import { redisClient } from "../../config/redis";
 import Manager from "../../Manager";
 import PlayerSocket from "../../Player";
 import { Player, User } from "../users/userModel";
-import { IUser } from "../users/userType";
 import { GameSession } from "./gameSession";
 import { PlatformSessionModel } from "./sessionModel";
-import { NewEventType } from "../../utils/eventTypes";
+import { Channels, Events } from "../../utils/events";
+import GameManager from "../../game/GameManager";
+import { Socket } from "socket.io";
+import { IUser } from "../users/userType";
+import { Platform } from "../games/gameModel";
 
+const SESSION_EXPIRATION_TIME = 3600; // 1 hour in seconds
 
 class SessionManager {
 
     private playground: Map<string, PlayerSocket> = new Map();
     private control: Map<string, Manager> = new Map();
 
-    public async startSession(player: PlayerSocket) {
+    constructor() {
+        // Start periodic cleanup of stale sessions
+        setInterval(this.cleanupStaleSessions, SESSION_EXPIRATION_TIME * 1000);
+    }
+
+    private getPlayerDetails = async (username: string) => {
+        const player = await Player.findOne({ username }).populate<{ createdBy: IUser }>("createdBy", "username");
+        if (player) {
+            return {
+                credits: player.credits,
+                status: player.status,
+                managerName: player.createdBy?.username || null
+            };
+        }
+        throw new Error("Player not found");
+    };
+
+    private getManagerDetails = async (username: string) => {
+        const manager = await User.findOne({ username });
+        if (manager) {
+            return { credits: manager.credits, status: manager.status };
+        }
+        throw new Error("Manager not found");
+    }
+
+    private async getGameNameByTagName(tagName: string): Promise<string> {
         try {
-            const sessionData = player.getSummary();
+            const platform = await Platform.aggregate([
+                { $unwind: "$games" },
+                { $match: { "games.tagName": tagName } },
+                { $project: { _id: 0, gameName: "$games.name" } },
+                { $limit: 1 }
+            ]);
 
-            this.playground.set(player.playerData.username, player);
+            if (platform.length === 0) {
+                return "Unknown Game"; // Default if not found
+            }
 
-            await redisClient.pubClient.hSet(
-                `playground:${player.playerData.username}`,
-                {
-                    "playerId": sessionData.playerId,
-                    "status": sessionData.status,
-                    "initialCredits": sessionData.initialCredits?.toString() || "0",
-                    "currentCredits": sessionData.currentCredits?.toString() || "0",
-                    "managerName": sessionData.managerName || "",
-                    "entryTime": sessionData.entryTime.toISOString(),
-                    "exitTime": sessionData.exitTime ? sessionData.exitTime.toISOString() : "null",
-                    "currentRTP": sessionData.currentRTP?.toString() || "0",
-                    "currentGame": sessionData.currentGame ? JSON.stringify(sessionData.currentGame) : "null",
-                    "userAgent": sessionData.userAgent || "",
-                    "platformId": sessionData.platformId?.toString() || "",
-                }
-            );
-            const playgroundSessionData = new PlatformSessionModel(sessionData);
-            await playgroundSessionData.save();
-
-            await this.notify(player.playerData.username, NewEventType.PLAYGROUND_JOINED, sessionData);
-            this.sessionHeartbeat(player);
-
-            console.log(`✅ Playground session stored in Redis & memory for ${player.playerData.username}`);
+            return platform[0].gameName;
         } catch (error) {
-            console.error(`Failed to save playground session for player: ${player.playerData.username}`, error);
+            console.error(`❌ Error fetching game name for tag: ${tagName}`, error);
+            return "Unknown Game";
         }
     }
 
-    // TODO: Need to fix why it disconnects automatically when joined
-    public async endSession(player: PlayerSocket) {
+    // PLAYGROUND
+    public startSession = async (username: string, role: string, userAgent: string, socket: Socket) => {
         try {
-            this.playground.delete(player.playerData.username);
-            await redisClient.pubClient.del(`playground:${player.playerData.username}`);
-            await this.notify(player.playerData.username, NewEventType.PLAYGROUND_EXITED, player.getSummary());
-            await PlatformSessionModel.updateOne(
-                { playerId: player.playerData.username, entryTime: player.entryTime },
-                { $set: { exitTime: new Date() } }
-            )
 
-        } catch (error) {
-            console.error(`Failed to delete playground session for player: ${player.playerData.username}`, error);
-        }
-    }
-
-    public async startGame(player: PlayerSocket) {
-        try {
-            player.currentGameSession = new GameSession(player.playerData.username, player.currentGameData.gameId, player.playerData.credits);
-
-            player.currentGameSession.on(NewEventType.UPDATE_SPIN, async (summary) => {
-                await this.notify(player.playerData.username, NewEventType.UPDATE_SPIN, summary);
-            });
-
-            const gameSummary = player.currentGameSession?.getSummary();
-            await redisClient.pubClient.hSet(
-                `playground:${player.playerData.username}`,
-                { "currentGame": JSON.stringify(gameSummary) }
-            )
-
-            await this.notify(player.playerData.username, NewEventType.GAME_STARTED, gameSummary);
-        } catch (error) {
-            console.error(`Failed to start game session for player: ${player.playerData.username}`, error);
-        }
-    }
-
-    public async endGame(player: PlayerSocket) {
-        try {
-            console.log(`🎮 ENDING GAME SESSION FOR ${player.playerData.username}`);
-            if (!player.currentGameSession) {
-                console.warn(`⚠️ No active game session found for ${player.playerData.username}`);
+            // 🚀 Get player details
+            const playerDetails = await this.getPlayerDetails(username);
+            if (!playerDetails) {
+                socket.emit("error", "Player not found");
+                socket.disconnect();
                 return;
             }
 
-            const gameSummary = player.currentGameSession.getSummary();
-            console.log(`GAME SUMMARY FOR ${player.playerData.username}:`, gameSummary);
+            // ⚠️ Prevent duplicate sessions
+            if (this.playground.has(username)) {
+                socket.emit("error", "Player session already exists");
+                socket.disconnect();
+                return;
+            }
+
+            // ✅ Create Player Instance
+            const player = new PlayerSocket(username, role, playerDetails.status, playerDetails.credits, userAgent, socket, playerDetails.managerName);
+            this.playground.set(username, player);
+
+
+            // 📌 Store in Redis
+            const sessionData = player.getSummary();
+            await redisClient.pubClient.hSet(Channels.PLAYGROUND(username), {
+                "playerId": sessionData.playerId,
+                "status": sessionData.status,
+                "initialCredits": sessionData.initialCredits?.toString() || "0",
+                "currentCredits": sessionData.currentCredits?.toString() || "0",
+                "managerName": sessionData.managerName || "",
+                "entryTime": sessionData.entryTime.toISOString(),
+                "exitTime": sessionData.exitTime ? sessionData.exitTime.toISOString() : "null",
+                "currentRTP": sessionData.currentRTP?.toString() || "0",
+                "currentGame": sessionData.currentGame ? JSON.stringify(sessionData.currentGame) : "null",
+                "userAgent": sessionData.userAgent || "",
+                "platformId": sessionData.platformId?.toString() || "",
+            });
+            await redisClient.pubClient.expire(Channels.PLAYGROUND(username), SESSION_EXPIRATION_TIME);
+
+            // 📌 Save in MongoDB
+            await new PlatformSessionModel(sessionData).save();
+
+            // 🔔 Notify & Start Heartbeat
+            await this.notify(username, Events.PLAYGROUND_ENTER, sessionData);
+            this.startSessionHeartbeat(player);
+
+            console.log(`✅ Playground session stored for ${username}`);
+        } catch (error) {
+            console.error(`Failed to start playground session for player: ${username}`, error);
+        }
+    }
+
+    public async restoreSessionFromRedis(sessionData: any, socket: Socket): Promise<PlayerSocket | null> {
+        try {
+            console.log(`🔄 Restoring session from Redis for ${sessionData.playerId}`);
+
+            // ✅ Properly reconstruct the PlayerSocket object
+            const player = new PlayerSocket(
+                sessionData.playerId,
+                sessionData.role,
+                sessionData.status,
+                parseFloat(sessionData.currentCredits),
+                sessionData.userAgent,
+                socket,
+                sessionData.managerName
+            );
+
+            player.entryTime = new Date(sessionData.entryTime);
+            player.exitTime = sessionData.exitTime !== "null" ? new Date(sessionData.exitTime) : null;
+            player.currentRTP = parseFloat(sessionData.currentRTP);
+            player.platformData.platformId = sessionData.platformId;
+
+            // ✅ Restore game session if the player was in a game
+            if (sessionData.currentGame && sessionData.currentGame !== "null") {
+                try {
+                    const gameData = JSON.parse(sessionData.currentGame);
+                    player.currentGameData.gameId = gameData.gameId;
+                    player.currentGameData.gameSettings = gameData.gameSettings;
+                    player.currentGameData.currentGameManager = new GameManager(player.currentGameData);
+
+                    // ✅ Restore the GameSession instance
+                    player.currentGameSession = new GameSession(
+                        sessionData.playerId,
+                        gameData.gameId,
+                        parseFloat(sessionData.currentCredits)
+                    );
+
+                    player.currentGameSession.gameName = gameData.gameName || "Unknown Game";
+
+                } catch (error) {
+                    console.error(`❌ Failed to parse currentGame for ${sessionData.playerId}:`, error);
+                }
+            }
+
+            // ✅ Store restored player in memory
+            this.playground.set(sessionData.playerId, player);
+
+            // ✅ Ensure socket events are re-initialized
+            player.initializePlatformSocket(socket);
+
+            // ✅ Re-subscribe to Redis events
+            player.subscribeToRedisEvents();
+
+            // ✅ Restart heartbeat
+            this.startSessionHeartbeat(player);
+
+            console.log(`✅ Successfully restored session for ${sessionData.playerId}`);
+            return player;
+        } catch (error) {
+            console.error(`❌ Failed to restore session for ${sessionData.playerId}:`, error);
+            return null;
+        }
+    }
+
+    public endSession = async (username: string) => {
+        try {
+            const player = this.playground.get(username);
+            if (!player) {
+                console.warn(`⚠️ No active session found for ${username}`);
+                return;
+            }
+
+            // ❌ Stop Heartbeat
+            this.stopSessionHeartbeat(player);
+
+            // ❌ Remove from in-memory session
+            this.playground.delete(username);
+
+            // ❌ Remove from Redis
+            await redisClient.pubClient.del(Channels.PLAYGROUND(username));
+
+            // ❌ Notify control users about removal
+            await this.notify(username, Events.PLAYGROUND_EXIT, player.getSummary());
+
+
+            // ❌ Update MongoDB
+            await PlatformSessionModel.updateOne(
+                { playerId: player.playerData.username, entryTime: player.entryTime },
+                { $set: { exitTime: new Date() } }
+            );
+            console.log(`✅ Playground session ended for ${username}`);
+
+        } catch (error) {
+            console.error(`Failed to delete playground session for player: ${username}`, error);
+        }
+    }
+
+    public startSessionHeartbeat = (player: PlayerSocket) => {
+        if (!player || !player.platformData.socket) return;
+
+        // ✅ Stop any existing heartbeat before starting a new one
+        this.stopSessionHeartbeat(player);
+
+        // ✅ Start a new heartbeat interval
+        player.platformData.heartbeatInterval = setInterval(async () => {
+            if (!player.platformData.socket || !player.platformData.socket.connected) {
+                this.stopSessionHeartbeat(player);
+                return;
+            }
+            // ✅ Sync credit balance with Redis
+            await redisClient.pubClient.hSet(Channels.PLAYGROUND(player.playerData.username), {
+                "currentCredits": player.playerData.credits.toString()
+            });
+
+            // ✅ Send updated balance to the client
+            player.sendData(
+                { type: Events.PLAYGROUND_CREDITS, payload: { credits: player.playerData.credits } },
+                "platform"
+            );
+
+            // Send a ping to the client
+            player.platformData.socket.emit('ping');
+
+
+        }, 5000); // Update every 5 seconds
+    };
+
+    private stopSessionHeartbeat = (player: PlayerSocket) => {
+        if (player.platformData.heartbeatInterval) {
+            clearInterval(player.platformData.heartbeatInterval);
+            player.platformData.heartbeatInterval = null;
+            console.log(`💔 Stopped heartbeat for ${player.playerData.username}`);
+        }
+    };
+
+    private cleanupStaleSessions = async () => {
+        try {
+            const keys = await redisClient.pubClient.keys(`${Channels.PLAYGROUND('*')}`);
+            for (const key of keys) {
+                const ttl = await redisClient.pubClient.ttl(key);
+                if (ttl === -2) { // Key does not exist
+                    const username = key.split(':')[1];
+                    this.playground.delete(username);
+                    console.log(`🧹 Cleaned up stale session for ${username}`);
+                }
+            }
+        } catch (error) {
+            console.error("Error cleaning up stale sessions:", error);
+        }
+    };
+
+
+    // GAME
+    public startGame = async (username: string, gameId: string, socket: Socket) => {
+        try {
+            console.log(`🎰 Player ${username} entering game: ${gameId}`);
+
+            const player = this.playground.get(username);
+            if (!player) {
+                console.warn(`⚠️ No active session found for ${username}`);
+                return;
+            }
+
+            if (player.currentGameSession) {
+                console.warn(`⚠️ Player ${username} already in game: ${player.currentGameSession.gameId}`);
+                return;
+            }
+
+            const gameName = await this.getGameNameByTagName(gameId);
+
+            // ✅ Create and assign the game session
+            player.currentGameSession = new GameSession(username, gameId, player.playerData.credits);
+            player.currentGameSession.gameName = gameName;
+
+            console.log(`✅ Created game session for ${username}: ${gameId} (${gameName})`);
+
+
+            // ✅ Initialize the game socket
+            player.updateGameSocket(socket);
+
+            player.currentGameSession.on(Events.PLAYGROUND_GAME_SPIN, async (summary) => {
+                await this.notify(player.playerData.username, Events.PLAYGROUND_GAME_SPIN, summary);
+            });
+
+            // ✅ Store the game session in Redis
+            await redisClient.pubClient.hSet(Channels.PLAYGROUND(username), {
+                "currentGame": JSON.stringify(player.currentGameSession.getSummary())
+            });
+
+            await this.notify(username, Events.PLAYGROUND_GAME_ENTER, player.currentGameSession.getSummary());
+            console.log(`✅ Game session started for ${username}: ${gameId} (${player.currentGameSession.gameName})`);
+
+        } catch (error) {
+            console.error(`❌ Failed to start game session for ${username}:`, error);
+        }
+    }
+
+    public endGame = async (username: string) => {
+        try {
+            console.log(`🔍 Checking endGame() call for ${username}`);
+            console.trace(); // Logs the full stack trace
+
+            const player = this.playground.get(username);
+            if (!player || !player.currentGameSession) {
+                console.warn(`⚠️ No active game session found for ${username}`);
+                return;
+            }
+
+            console.log(`🚨 Ending game for ${username}: ${player.currentGameSession.gameId}`);
+
 
             player.currentGameSession.exitTime = new Date();
             player.currentGameSession.creditsAtExit = player.playerData.credits;
-            player.currentGameSession.sessionDuration = Math.abs(player.currentGameSession.exitTime.getTime() - player.currentGameSession.entryTime.getTime());
+            player.currentGameSession.sessionDuration = Math.abs(
+                player.currentGameSession.exitTime.getTime() - player.currentGameSession.entryTime.getTime()
+            );
             player.currentGameSession = null;
-            player.currentGameData.session = null;
 
-            if (player.currentGameData.socket) {
-                console.log(`Disconnecting game socket for ${player.playerData.username}`);
-                player.currentGameData.socket.disconnect();
-                player.currentGameData.socket = null;
-            }
-
-            if (player.currentGameData.heartbeatInterval) {
-                clearInterval(player.currentGameData.heartbeatInterval);
-                console.log(`💓 Cleared game heartbeat for ${player.playerData.username}`);
-            }
-
-            await redisClient.pubClient.hDel(`playground:${player.playerData.username}`, "currentGame");
+            await redisClient.pubClient.hDel(Channels.PLAYGROUND(username), "currentGame");
 
             await PlatformSessionModel.updateOne(
                 { playerId: player.playerData.username, entryTime: player.entryTime },
-                { $push: { gameSessions: gameSummary }, $set: { currentRTP: player.currentRTP } }
-            )
+                { $push: { gameSessions: player.currentGameSession?.getSummary() }, $set: { currentRTP: player.currentRTP } }
+            );
 
-            await this.notify(player.playerData.username, NewEventType.GAME_ENDED, gameSummary);
-            console.log(`✅ Successfully ended game session for ${player.playerData.username}`);
+            await this.notify(player.playerData.username, Events.PLAYGROUND_GAME_EXIT, username);
+            console.log(`✅ Successfully ended game session for ${username}`);
 
         } catch (error) {
-            console.error(`❌ Failed to end game session for player: ${player.playerData.username}`, error);
+            console.error(`❌ Failed to end game session for player: ${username}`, error);
         }
     }
 
-    public async getPlaygroundSession(username: string): Promise<PlayerSocket | null> {
-        if (this.playground.has(username)) {
-            return this.playground.get(username) || null;
+
+    // CONTROL
+    public addControlUser = async (username: string, role: string, socket: Socket) => {
+        try {
+            const managerDetails = await this.getManagerDetails(username);
+            // Prevent duplicate sessions
+            if (this.control.has(username)) {
+                socket.emit("error", "Control session already exists.");
+                socket.disconnect();
+                return;
+            }
+
+            // Create Manager Instance
+            const manager = new Manager(username, managerDetails.credits, role, socket.handshake.headers["user-agent"], socket);
+            this.control.set(username, manager);
+
+            // Update Redis
+            await redisClient.pubClient.hSet(Channels.CONTROL(role, username), {
+                username,
+                role: "manager",
+                credits: manager.credits.toString()
+            });
+
+            console.log(`✅ Control session stored for ${username}`);
+        } catch (error) {
+            console.error(`❌ Failed to add control user:`, error);
         }
-        return null;
     }
 
-    private async notify(username: string, eventType: NewEventType, payload: any) {
+    public removeControlUser = async (username: string, role: string) => {
+        try {
+            const manager = this.control.get(username);
+            if (manager) {
+                // ❌ Stop heartbeat before removing session
+                this.stopControlHeartbeat(manager);
+            }
+
+            this.control.delete(username);
+            await redisClient.pubClient.del(Channels.CONTROL(role, username));
+
+            console.log(`✅ Control session deleted for ${username}`);
+        } catch (error) {
+            console.error(`❌ Failed to delete control session for ${username}`, error);
+        }
+    };
+
+    public async restoreControlUserFromRedis(sessionData: any, socket: Socket): Promise<Manager | null> {
+        try {
+            console.log(`🔄 Restoring manager session from Redis for ${sessionData.username}`);
+
+            // ✅ Properly reconstruct the Manager object
+            const manager = new Manager(
+                sessionData.username,
+                parseFloat(sessionData.credits),
+                sessionData.role,
+                sessionData.userAgent,
+                socket
+            );
+
+            // ✅ Store the restored manager in memory
+            this.control.set(sessionData.username, manager);
+
+            // ✅ Re-subscribe to Redis events
+            manager.subscribeToRedisEvents();
+
+            // ✅ Restart heartbeat
+            this.startControlHeartbeat(manager);
+
+            console.log(`✅ Successfully restored manager session for ${sessionData.username}`);
+            return manager;
+        } catch (error) {
+            console.error(`❌ Failed to restore control session for ${sessionData.username}:`, error);
+            return null;
+        }
+    }
+
+    public startControlHeartbeat = (manager: Manager) => {
+        if (!manager || !manager.socketData.socket) return;
+
+        // ✅ Stop any existing heartbeat before starting a new one
+        this.stopControlHeartbeat(manager);
+
+        // ✅ Start a new heartbeat interval
+        manager.socketData.heartbeatInterval = setInterval(async () => {
+            if (!manager.socketData.socket || !manager.socketData.socket.connected) {
+                this.stopControlHeartbeat(manager);
+                return;
+            }
+
+            // Send control session updates
+            manager.sendData({
+                type: Events.CONTROL_CREDITS,
+                payload: { credits: manager.credits, role: manager.role, worker: process.pid }
+            });
+
+            // Send all active players data
+            const allPlayers = await manager.handleGetAllPlayers();
+            manager.sendData({ type: Events.PLAYGROUND_ALL, payload: allPlayers });
+
+        }, 5000); // Update every 5 seconds
+    };
+
+    public stopControlHeartbeat = (manager: Manager) => {
+        if (manager.socketData.heartbeatInterval) {
+            clearInterval(manager.socketData.heartbeatInterval);
+            manager.socketData.heartbeatInterval = null;
+        }
+    };
+
+
+
+    // HELPER
+    private notify = async (username: string, event: Events, payload: any) => {
         try {
             const hierarchyUsers = await Player.getHierarchyUsers(username);
 
             for (const manager of hierarchyUsers) {
                 const channel = `control:${manager.role}:${manager.username}`;
-                await redisClient.pubClient.publish(channel, JSON.stringify({ type: eventType, payload }));
-                console.log(`📢 Published event to ${channel}:`, { type: eventType, payload });
+                await redisClient.pubClient.publish(channel, JSON.stringify({ type: event, payload }));
+                console.log(`📢 Published event to ${channel}:`, { type: event, payload });
             }
 
         } catch (error) {
@@ -148,54 +474,12 @@ class SessionManager {
         }
     }
 
-    private async sessionHeartbeat(player: PlayerSocket) {
-        if (!player || !player.platformData.socket) return;
-
-        player.sendData({ type: "CREDIT", data: { credits: player.playerData.credits } }, "platform");
-
-        player.platformData.heartbeatInterval = setInterval(() => {
-            if (!player.platformData.socket || !player.platformData.socket.connected) {
-                clearInterval(player.platformData.heartbeatInterval);
-                console.log(`💔 Stopped heartbeat for ${player.playerData.username}`);
-                return;
-            }
-
-            player.sendData({ type: "CREDIT", data: { credits: player.playerData.credits, worker: process.pid } }, "platform");
-        }, 5000); // Update every 5 seconds
+    public getControlUser = (username: string): Manager | null => {
+        return this.control.get(username) || null;
     }
 
-    public async addControlUser(user: Manager) {
-        try {
-            this.control.set(user.username, user);
-            await redisClient.pubClient.hSet(
-                `control:${user.role}:${user.username}`,
-                {
-                    "username": user.username,
-                    "role": user.role,
-                    "credits": user.credits.toString(),
-                    "userAgent": user.userAgent || "",
-                }
-            );
-            console.log(`✅ Control session stored in Redis & memory for ${user.username}`);
-        } catch (error) {
-            console.error(`❌ Failed to save control session for user: ${user.username}`, error);
-        }
-    }
-
-    public async removeControlUser(username: string) {
-        try {
-            this.control.delete(username);
-            await redisClient.pubClient.del(`control:${username}`);
-            console.log(`✅ Control session deleted from Redis & memory for ${username}`);
-        } catch (error) {
-            console.error(`❌ Failed to delete control session for user: ${username}`, error);
-        }
-    }
-
-
-    public async getPlayerCurrentGameSession(username: string) {
-        const playerSession = await this.getPlaygroundSession(username);
-        return playerSession?.currentGameSession || null;
+    public getPlaygroundUser = (username: string): PlayerSocket | null => {
+        return this.playground.get(username) || null;
     }
 
 }

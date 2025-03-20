@@ -5,16 +5,14 @@ import Payouts from "./payoutModel";
 import path from "path";
 import { Platform } from "../games/gameModel";
 import { ObjectId } from "mongodb";
-import { sessionManager } from "../session/sessionManager";
 import { redisClient } from "../../config/redis";
-import { NewEventType } from "../../utils/eventTypes";
+import { Channels, Events } from "../../utils/events";
 
 interface GameRequest extends Request {
   files?: {
     [fieldname: string]: Express.Multer.File[];
   };
 }
-
 
 class PayoutsController {
 
@@ -75,13 +73,13 @@ class PayoutsController {
         payoutData: payoutJSONData
       };
 
-      const playgrounds = await redisClient.pubClient.keys("playground:*");
+      const playgrounds = await redisClient.pubClient.keys(Channels.PLAYGROUND("*"));
 
       for (const playgroundKey of playgrounds) {
         const username = playgroundKey.split(":")[1];
         const playgroundSession = await redisClient.pubClient.hGetAll(playgroundKey);
         if (playgroundSession.currentGame && JSON.parse(playgroundSession.currentGame).gameId === tagName) {
-          await redisClient.pubClient.publish(`player:${username}`, JSON.stringify({ type: NewEventType.UPDATE_PAYOUT, payload: updatePayload }));
+          await redisClient.pubClient.publish(Channels.PLAYGROUND(username), JSON.stringify({ type: Events.PLAYGROUND_GAME_UPDATE, payload: updatePayload }));
           console.log(`📢 Published NEW_GAME_VERSION event for ${tagName} to ${username}`);
         }
       }
@@ -272,13 +270,13 @@ class PayoutsController {
       }
 
       const newPayoutData = updatedPayout[0].content.data;
-      const playgrounds = await redisClient.pubClient.keys("playground:*");
+      const playgrounds = await redisClient.pubClient.keys(Channels.PLAYGROUND("*"));
 
       for (const playgroundKey of playgrounds) {
         const username = playgroundKey.split(":")[1];
         const playgroundSession = await redisClient.pubClient.hGetAll(playgroundKey);
         if (playgroundSession.currentGame && JSON.parse(playgroundSession.currentGame).gameId === tagName) {
-          await redisClient.pubClient.publish(`player:${username}`, JSON.stringify({ type: NewEventType.UPDATE_PAYOUT, payload: newPayoutData }));
+          await redisClient.pubClient.publish(Channels.PLAYGROUND(username), JSON.stringify({ type: Events.PLAYGROUND_GAME_UPDATE, payload: newPayoutData }));
           console.log(`📢 Published NEW_GAME_VERSION event for ${tagName} to ${username}`);
         }
       }

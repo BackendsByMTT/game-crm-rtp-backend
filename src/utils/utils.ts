@@ -113,7 +113,7 @@ export const updateStatus = async (client: IUser | IPlayer, status: string) => {
   // TODO: NEED TO CONSIDER THIS
   // for (const [username, playerSocket] of sessionManager.getPlatformSessions()) {
   //   if (playerSocket) {
-  //     const socketUser = await sessionManager.getPlaygroundSession(client.username)
+  //     const socketUser = await sessionManager.getPlaygroundUser(client.username)
   //     if (socketUser) {
   //       if (status === 'inactive') {
   //         socketUser.forceExit();
