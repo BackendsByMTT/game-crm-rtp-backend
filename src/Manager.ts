@@ -3,7 +3,7 @@ import { Player } from "./dashboard/users/userModel";
 import { sessionManager } from "./dashboard/session/sessionManager";
 import { PlatformSessionModel } from "./dashboard/session/sessionModel";
 import { redisClient } from "./config/redis";
-import { NewEventType } from "./utils/eventTypes";
+import { Channels, Events } from "./utils/events";
 
 
 export interface socketConnectionData {
@@ -33,34 +33,40 @@ export default class Manager {
 
 
     private subscribeToRedisEvents() {
-        redisClient.subClient.subscribe(`control:${this.role}:${this.username}`, (message) => {
+        const channel = Channels.CONTROL(this.role, this.username);
+
+        redisClient.subClient.subscribe(channel, (message) => {
             const data = JSON.parse(message);
             console.log(`🔄 Syncing state for ${this.username}:`, data);
 
             switch (data.type) {
-                case "UPDATE_BALANCE":
+                case Events.CONTROL_CREDITS:
                     this.credits = data.payload.credits;
-                    this.sendData({ type: "CREDIT", data: { credits: this.credits } });
+                    this.sendData({ type: Events.CONTROL_CREDITS, payload: this.credits });
                     break;
 
-                case NewEventType.PLAYGROUND_JOINED:
-                    this.socketData.socket.emit("PLATFORM", { type: "ENTERED_PLATFORM", payload: data.payload });
+                case Events.PLAYGROUND_ENTER:
+                    this.sendData({ type: Events.PLAYGROUND_ENTER, payload: data.payload });
                     break;
 
-                case NewEventType.PLAYGROUND_EXITED:
-                    this.socketData.socket.emit("PLATFORM", { type: "EXITED_PLATFORM", payload: data.payload });
-                    break
-
-                case NewEventType.GAME_STARTED:
-                    this.socketData.socket.emit("PLATFORM", { type: "ENTERED_GAME", payload: data.payload });
+                case Events.PLAYGROUND_EXIT:
+                    this.sendData({ type: Events.PLAYGROUND_EXIT, payload: data.payload });
                     break;
 
-                case NewEventType.GAME_ENDED:
-                    this.socketData.socket.emit("PLATFORM", { type: "EXITED_GAME", payload: data.payload });
+                case Events.PLAYGROUND_GAME_ENTER:
+                    this.sendData({ type: Events.PLAYGROUND_GAME_ENTER, payload: data.payload });
                     break;
 
-                case NewEventType.UPDATE_SPIN:
-                    this.socketData.socket.emit("PLATFORM", { type: "UPDATE_SPIN", payload: data.payload });
+                case Events.PLAYGROUND_GAME_EXIT:
+                    this.sendData({ type: Events.PLAYGROUND_GAME_EXIT, payload: data.payload });
+                    break;
+
+                case Events.PLAYGROUND_GAME_SPIN:
+                    this.sendData({ type: Events.PLAYGROUND_GAME_SPIN, payload: data.payload });
+                    break;
+
+                case Events.PLAYGROUND_ALL:
+                    this.handleGetAllPlayers();
                     break;
 
                 default:
@@ -93,16 +99,15 @@ export default class Manager {
             socket: socket,
             heartbeatInterval: setInterval(async () => {
                 if (this.socketData.socket) {
-                    // Fetch all players from Redis and send to the manager
-                    const allActivePlayers = await this.getAllPlaygroundPlayers();
-                    this.socketData.socket.emit(NewEventType.ALL_PLAYGROUND_PLAYERS, allActivePlayers);
+                    const allActivePlayers = await this.handleGetAllPlayers();
+                    this.sendData({ type: Events.PLAYGROUND_ALL, payload: allActivePlayers });
 
                     this.sendData({
-                        type: "CREDITS",
+                        type: Events.CONTROL_CREDITS,
                         payload: { credits: this.credits, role: this.role, worker: process.pid }
                     });
                 }
-            }, 5000), // Updates every 5 seconds
+            }, 5000),
             reconnectionAttempts: 0,
             maxReconnectionAttempts: 3,
             reconnectionTimeout: null,
@@ -116,22 +121,21 @@ export default class Manager {
             this.handleDisconnection();
         });
 
-        await sessionManager.addControlUser(this);
-        this.sendData({ type: "CREDITS", payload: { credits: this.credits, role: this.role } })
     }
 
     private async handleDisconnection() {
 
-        clearInterval(this.socketData.heartbeatInterval); // Clear heartbeat on disconnect
+        clearInterval(this.socketData.heartbeatInterval);
         this.socketData.socket = null;
 
         this.socketData.reconnectionTimeout = setTimeout(async () => {
             console.log(`Removing manager ${this.username} due to prolonged disconnection`);
             await sessionManager.removeControlUser(this.username);
-        }, 60000); // 1-minute timeout for reconnection
+        }, 60000);
     }
 
 
+    // TODO: Check we are using this
     private initializeSocketHandler() {
         if (this.socketData.socket) {
             this.socketData.socket.on("data", async (message, callback) => {
@@ -193,7 +197,7 @@ export default class Manager {
             }
 
             // Notify the player socket of the status change
-            const playerSocket = await sessionManager.getPlaygroundSession(data.playerId)
+            const playerSocket = await sessionManager.getPlaygroundUser(data.playerId)
 
             if (playerSocket) {
                 if (data.status === "inactive") {
@@ -233,7 +237,7 @@ export default class Manager {
         }
     }
 
-    private async getAllPlaygroundPlayers(): Promise<any[]> {
+    private async handleGetAllPlayers(): Promise<any[]> {
         try {
             const allPlayers: any[] = [];
             const playgroundKeys = await redisClient.pubClient.keys("playground:*");
@@ -273,7 +277,7 @@ export default class Manager {
         }
     }
 
-    public sendData(data: any) {
+    public sendData(data: { type: Events, payload: any }) {
         if (this.socketData.socket) {
             this.socketData.socket.emit("data", data)
         }

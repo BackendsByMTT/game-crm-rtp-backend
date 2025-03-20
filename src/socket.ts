@@ -67,7 +67,7 @@ const handlePlayerConnection = async (socket: Socket, decoded: DecodedToken, use
         const { credits, status, managerName } = await getPlayerDetails(username);
         console.log(`Player details - Credits: ${credits}, Status: ${status}, Manager Name: ${managerName}`);
 
-        let existingPlayer = await sessionManager.getPlaygroundSession(username);
+        let existingPlayer = await sessionManager.getPlaygroundUser(username);
         console.log(`Existing player: ${existingPlayer ? 'Yes' : 'No'}`);
 
         if (existingPlayer) {

@@ -77,7 +77,7 @@ export class SLSB {
   public async spinResult(): Promise<void> {
     try {
       const playerData = this.getPlayerData();
-      const platformSession = await sessionManager.getPlaygroundSession(playerData.username);
+      const platformSession = await sessionManager.getPlaygroundUser(playerData.username);
 
       if (this.settings.currentBet > playerData.credits) {
         this.sendError("Low Balance");
