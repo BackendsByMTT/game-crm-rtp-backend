@@ -3,7 +3,7 @@ name: Build and Deploy
 on:
   push:
     branches:
-      - "dev"
+      - "dev-g"
   workflow_dispatch:
 
 permissions:
@@ -16,8 +16,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: dev
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -28,21 +26,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.G_TOKEN }}
         run: |
-          git fetch origin dev-build:dev-build # Ensure you're up-to-date with dev-build
-          git stash || echo "No changes to stash" # Stash only if there are changes
-          git checkout dev-build
-          git config user.name "TrippyRahul"
-          git config user.email "rahulrawat.trippybug@gmail.com"
-          rm -rf ./package*.json ./dist ./src ./app.js
-          git add .
-          git commit -m "remove old artifacts" || echo "No changes to commit"
-          git checkout dev -- ./package*.json
-          git add ./package.json 
-          git commit -m "update package.json" || echo "No changes to commit"
-          git push --force origin dev-build
-          git stash pop || echo "No local changes to pop" # Handle no stash scenario
-          git checkout dev
-
+          git checkout dev-g
+          git checkout -b dev-build-g
+        # git config user.name "TrippyRahul"
+        # git config user.email "rahulrawat.trippybug@gmail.com"
+        # rm -rf ./src ./app.js
+        # git add .
+        # git commit -m "remove old artifacts" || echo "No changes to commit"
+        # git checkout dev-g
+         
       - name: Install Dependencies
         run: npm install
 
@@ -55,75 +47,16 @@ jobs:
           name: artifact
           path: ./dist/**/*.js
 
-      - name: Commit and Push Build Artifacts
-        env:
-          GITHUB_TOKEN: ${{ secrets.G_TOKEN }}
+      - name: Copy Src and app.js in root
         run: |
-          git config advice.addIgnoredFile false
-          git rev-parse --abbrev-ref HEAD
-          git config --global user.name "TrippyRahul"
-          git config --global user.email "rahulrawat.trippybug@gmail.com"
-          git checkout -b build-artifacts
-          git add -f ./dist
-          git commit -m 'added: build artifacts'
-          git push --set-upstream origin build-artifacts
-
-  create_pull_request:
-    needs: build
-    runs-on: ubuntu-latest
-    outputs:
-      pull_request_number: ${{ steps.create_pr.outputs.pull-request-number }}
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Download Build Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: artifact
-
-      - name: List Downloaded Artifacts
-        run: ls -l
-
-      - name: Create Pull Request
-        id: create_pr
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.G_TOKEN }}
-          commit-message: "added: build artifacts"
-          branch: build-artifacts
-          base: dev-build
-          title: "Add build artifacts"
-          body: "This pull request contains the build artifacts."
-          labels: "auto-approve"
-
-  merge_pull_request:
-    needs: create_pull_request
-    runs-on: ubuntu-latest
-    steps:
-      - name: Merge Pull Request
-        run: |
-          PR_NUMBER="${{ needs.create_pull_request.outputs.pull_request_number }}"
-          curl -X PUT \
-            -H "Authorization: token ${{ secrets.G_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}/merge
-
-  cleanup:
-    if: ${{ always() }}
-    needs: [merge_pull_request, build]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Delete Build Artifacts Branch
-        env:
-          GITHUB_TOKEN: ${{ secrets.G_TOKEN }}
-        run: |
-          BRANCH_NAME="build-artifacts"
-          if git ls-remote --exit-code origin "$BRANCH_NAME"; then
-            git push origin --delete "$BRANCH_NAME"
-          else
-            echo "Branch $BRANCH_NAME does not exist on the remote. Skipping deletion."
-          fi
+          git config --global user.email "prathamesh@underpinservices.com"
+          git config --global user.name "Prathm0025"
+          git stash -u
+          git checkout dev-build-g
+          cp -r ./dist/src .
+          cp -r ./dist/app.js .
+          rm -rf ./dist
+          rm -rf ./node_modules
+          git add -f ./app.js ./src
+          git commit -m "add new build" || echo "No changes to commit"
+          git push origin dev-build-g --force
