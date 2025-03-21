@@ -171,7 +171,7 @@ export class GameController {
 
       const playerSession = await sessionManager.getPlaygroundUser(username);
       if (!playerSession) {
-        console.log(`No active session found for player ${username}`);
+        console.log(`❌ No active session found for player ${username}`);
         throw createHttpError(403, "No active session found. Please reconnect to the platform");
       }
 
