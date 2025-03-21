@@ -22,7 +22,7 @@ import globalErrorHandler from './src/dashboard/middleware/globalHandler';
 
 const app = express();
 
-// CORS for WebSockets and Express API
+// CORS for WebSockets and Express API//
 const corsOptions = {
   origin: config.allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], // Allow only major HTTP methods
