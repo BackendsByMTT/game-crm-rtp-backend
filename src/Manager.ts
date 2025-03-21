@@ -60,6 +60,7 @@ export default class Manager {
 
     public subscribeToRedisEvents() {
         const channel = Channels.CONTROL(this.role, this.username);
+        console.log(`${this.username} : joined  : ${channel}`)
 
         redisClient.subClient.subscribe(channel, (message) => {
             const data = JSON.parse(message);
@@ -120,13 +121,14 @@ export default class Manager {
     private async handleDisconnection() {
         // ❌ Stop the heartbeat when manager disconnects
         sessionManager.stopControlHeartbeat(this);
+        await sessionManager.removeControlUser(this.username, this.role);
+
 
         clearInterval(this.socketData.heartbeatInterval);
         this.socketData.socket = null;
 
         this.socketData.reconnectionTimeout = setTimeout(async () => {
             console.log(`Removing manager ${this.username} due to prolonged disconnection`);
-            await sessionManager.removeControlUser(this.username, this.role);
         }, 60000);
     }
 

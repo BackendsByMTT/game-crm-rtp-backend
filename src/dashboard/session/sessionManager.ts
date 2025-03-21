@@ -148,6 +148,9 @@ class SessionManager {
             // ✅ Restart heartbeat
             this.startSessionHeartbeat(player);
 
+            await this.notify(sessionData.playerId, Events.PLAYGROUND_GAME_ENTER, player.currentGameSession.getSummary());
+
+
             console.log(`✅ Successfully restored session for ${sessionData.playerId}`);
             return player;
         } catch (error) {
@@ -381,7 +384,7 @@ class SessionManager {
             // Update Redis
             await redisClient.pubClient.hSet(Channels.CONTROL(role, username), {
                 username,
-                role: "manager",
+                role,
                 credits: manager.credits.toString()
             });
 
