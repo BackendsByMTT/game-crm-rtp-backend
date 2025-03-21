@@ -5,10 +5,11 @@ import { Player, User } from "../users/userModel";
 import { GameSession } from "./gameSession";
 import { PlatformSessionModel } from "./sessionModel";
 import { Channels, Events } from "../../utils/events";
-import GameManager from "../../game/GameManager";
 import { Socket } from "socket.io";
 import { IUser } from "../users/userType";
 import { Platform } from "../games/gameModel";
+import { v4 as uuidv4 } from "uuid";
+
 
 const SESSION_EXPIRATION_TIME = 3600; // 1 hour in seconds
 
@@ -65,6 +66,7 @@ class SessionManager {
     // PLAYGROUND
     public startSession = async (username: string, role: string, userAgent: string, socket: Socket) => {
         try {
+            const sessionId = uuidv4();
 
             // 🚀 Get player details
             const playerDetails = await this.getPlayerDetails(username);
@@ -83,12 +85,14 @@ class SessionManager {
 
             // ✅ Create Player Instance
             const player = new PlayerSocket(username, role, playerDetails.status, playerDetails.credits, userAgent, socket, playerDetails.managerName);
+            player.sessionId = sessionId; // Store it inside PlayerSocket
             this.playground.set(username, player);
 
 
             // 📌 Store in Redis
             const sessionData = player.getSummary();
             await redisClient.pubClient.hSet(Channels.PLAYGROUND(username), {
+                "sessionId": sessionId,
                 "playerId": sessionData.playerId,
                 "status": sessionData.status,
                 "initialCredits": sessionData.initialCredits?.toString() || "0",
@@ -135,6 +139,7 @@ class SessionManager {
             player.exitTime = sessionData.exitTime !== "null" ? new Date(sessionData.exitTime) : null;
             player.currentRTP = parseFloat(sessionData.currentRTP);
             player.platformData.platformId = sessionData.platformId;
+            player.sessionId = sessionData.sessionId || uuidv4(); // Use existing or fallback
 
             // ✅ Store restored player in memory
             this.playground.set(sessionData.playerId, player);
@@ -182,7 +187,7 @@ class SessionManager {
 
             // ❌ Update MongoDB
             await PlatformSessionModel.updateOne(
-                { playerId: player.playerData.username, entryTime: player.entryTime },
+                { playerId: player.playerData.username, sessionId: player.sessionId },
                 { $set: { exitTime: new Date() } }
             );
             console.log(`✅ Playground session ended for ${username}`);
@@ -328,7 +333,7 @@ class SessionManager {
 
                 // 📝 Store game session in MongoDB
                 await PlatformSessionModel.updateOne(
-                    { playerId: player.playerData.username, entryTime: player.entryTime },
+                    { playerId: player.playerData.username, sessionId: player.sessionId },
                     {
                         $push: { gameSessions: player.currentGameSession.getSummary() },
                         $set: { currentRTP: player.currentRTP }

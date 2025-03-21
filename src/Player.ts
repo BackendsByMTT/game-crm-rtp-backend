@@ -53,6 +53,7 @@ export default class PlayerSocket {
   currentRTP: number = 0;
   currentGameSession: GameSession | null = null;
   lastPing: Date = null;
+  sessionId: string;
 
 
   constructor(username: string, role: string, status: string, credits: number, userAgent: string, socket: Socket, managerName: string) {
@@ -457,6 +458,7 @@ export default class PlayerSocket {
 
   public getSummary() {
     return {
+      sessionId: this.sessionId,
       playerId: this.playerData.username,
       status: this.playerData.status,
       managerName: this.managerName,

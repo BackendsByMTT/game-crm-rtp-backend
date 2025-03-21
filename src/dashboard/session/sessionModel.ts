@@ -42,6 +42,7 @@ const GameSessionSchema: Schema<IGameSession> = new Schema({
 }, { _id: false });
 
 const PlatformSessionSchema: Schema = new Schema({
+    sessionId: { type: String, index: 1, required: true },
     playerId: { type: String, required: true },
     managerName: { type: String, required: true },
     initialCredits: { type: Number, required: true },
