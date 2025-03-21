@@ -101,7 +101,7 @@ const handlePlayerConnection = (socket, decoded, userAgent) => __awaiter(void 0,
                 return;
             }
         }
-        // New platform connection
+        // New platform connections
         if (origin) {
             const newUser = new Player_1.default(username, decoded.role, status, credits, userAgent, socket, managerName);
             newUser.platformData.platformId = platformId;
