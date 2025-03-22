@@ -166,7 +166,7 @@ export class GameController {
       if (existingUser && existingUser.gameData.socket) {
         throw createHttpError(403, "You already have an active game session. Please wait for a while before disconnecting")
       }
-
+      
 
       const platform = await Platform.aggregate([
         { $unwind: "$games" },

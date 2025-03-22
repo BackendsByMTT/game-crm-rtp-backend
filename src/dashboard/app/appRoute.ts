@@ -12,7 +12,7 @@ appRoutes.get('/metrics', checkUser,
   // checkRole(["admin"]),
   getAppMetrics);
 
-appRoutes.post('/background', checkUser, setBackground);
+appRoutes.post('/background',  checkUser, setBackground);
 
 
 export default appRoutes;
