@@ -51,6 +51,7 @@ export const getAppMetrics = async (req: Request, res: Response) => {
 
 export const setBackground = async (req: Request, res: Response) => {
   try {
+    // console.log("req", req);
     if (!req.body || typeof req.body.isBack !== 'boolean') {
       return res.status(400).json({ error: "background boolean is required" });
     }
