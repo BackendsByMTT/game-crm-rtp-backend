@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { incrementInstall, incrementDownload, getAppMetrics, setBackground } from './appController';
+import { incrementInstall, incrementDownload, getAppMetrics } from './appController';
 import { checkUser } from '../middleware/checkUser';
 import { checkRole } from '../middleware/checkRole';
 
@@ -12,7 +12,7 @@ appRoutes.get('/metrics', checkUser,
   // checkRole(["admin"]),
   getAppMetrics);
 
-appRoutes.post('/background',  checkUser, setBackground);
+// appRoutes.post('/background',  checkUser, setBackground);
 
 
 export default appRoutes;
