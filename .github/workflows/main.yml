@@ -30,7 +30,9 @@ jobs:
           git checkout -b dev-build
           git config user.name "TrippyRahul"
           git config user.email "rahulrawat.trippybug@gmail.com"
-          rm -rf ./src ./app.js ./copyStaticAsset.js
+          rm -rf ./src 
+          rm -rf ./app.js 
+          rm -rf ./copyStaticAsset.js
           git add .
           git commit -m "remove old artifacts" || echo "No changes to commit"
           git checkout dev
@@ -53,7 +55,7 @@ jobs:
           git checkout dev-build
           cp -r ./dist/src .
           cp -r ./dist/app.js .
-          cp ./copyStaticAsset.js .
+          git checkout dev -- copyStaticAsset.js
           rm -rf ./dist
           rm -rf ./node_modules
           git add -f ./app.js ./src ./copyStaticAsset.js
