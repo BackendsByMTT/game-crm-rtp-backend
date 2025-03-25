@@ -19,19 +19,20 @@ import sessionRoutes from "./dashboard/session/sessionRoutes";
 import { addOrderToExistingGames } from "./dashboard/games/script"
 import appRoutes from "./dashboard/app/appRoute";
 import path from "path";
+
 declare module "express-session" {
   interface Session {
     captcha?: string;
   }
 }
 
-
 const app = express();
-//Cloudinary configs
+
+// Body parser
 app.use(express.json({ limit: "25mb" }));
 app.use(express.urlencoded({ limit: "25mb", extended: true }));
-app.use(express.static(path.join(__dirname, "public")));
 
+// Custom CORS middleware
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -43,16 +44,13 @@ app.use((req, res, next) => {
   next();
 });
 
-
-
 app.use(cors({
   origin: [`*.${config.hosted_url_cors}`, 'https://game-crm-rtp-backend.onrender.com']
 }));
 
-
 const server = createServer(app);
 
-// HEALTH ROUTES
+// HEALTH CHECK ROUTE — make sure this comes BEFORE static
 app.get("/", (req, res, next) => {
   const health = {
     uptime: process.uptime(),
@@ -62,9 +60,10 @@ app.get("/", (req, res, next) => {
   res.status(200).json(health);
 });
 
+// CAPTCHA
 app.get("/captcha", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    var captcha = svgCaptcha.create();
+    const captcha = svgCaptcha.create();
     if (captcha) {
       req.session.captcha = captcha.text;
       res.status(200).json(captcha.data);
@@ -76,19 +75,25 @@ app.get("/captcha", async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+// Render the game manually
 app.get("/play", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
+// Your routes
 app.use("/api/company", adminRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/transactions", transactionRoutes);
 app.use("/api/games", gameRoutes);
-app.use("/api/payouts", checkUser, checkRole(["admin"]), payoutRoutes)
+app.use("/api/payouts", checkUser, checkRole(["admin"]), payoutRoutes);
 app.use("/api/toggle", checkUser, checkRole(["admin"]), toggleRoutes);
 app.use("/api/session", sessionRoutes);
 app.use("/api/app", appRoutes);
 
+// ✅ Static middleware AFTER routes and disable auto-index.html
+app.use(express.static(path.join(__dirname, "public"), { index: false }));
+
+// Socket.io
 const io = new Server(server, {
   cors: {
     origin: "*",
@@ -103,7 +108,7 @@ const io = new Server(server, {
 socketController(io);
 addOrderToExistingGames();
 
-
+// Global Error Handler
 app.use(globalErrorHandler);
 
 export default server;
