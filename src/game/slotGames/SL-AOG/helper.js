@@ -199,13 +199,9 @@ function sendInitData(gameInstance) {
     gameUtils_1.UiInitData.paylines = (0, gameUtils_1.convertSymbols)(gameInstance.settings.Symbols);
     const reels = generateInitialReel(gameInstance.settings);
     gameInstance.settings.reels = reels;
-    let features = [];
-    features.push(gameInstance.settings.smallWheelFeature.featureValues);
-    features.push(gameInstance.settings.mediumWheelFeature.featureValues);
-    features.push(gameInstance.settings.largeWheelFeature.featureValues);
     const dataToSend = {
         GameData: {
-            features,
+            Reel: reels,
             linesApiData: gameInstance.settings.currentGamedata.linesApiData,
             Bets: gameInstance.settings.currentGamedata.bets,
         },

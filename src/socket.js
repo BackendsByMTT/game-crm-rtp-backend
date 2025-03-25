@@ -60,78 +60,71 @@ const getManagerDetails = (username) => __awaiter(void 0, void 0, void 0, functi
     throw new Error("Manager not found");
 });
 const handlePlayerConnection = (socket, decoded, userAgent) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const username = decoded.username;
-        const platformId = socket.handshake.auth.platformId;
-        const origin = socket.handshake.auth.origin;
-        const gameId = socket.handshake.auth.gameId;
-        const { credits, status, managerName } = yield getPlayerDetails(username);
-        let existingPlayer = sessionManager_1.sessionManager.getPlayerPlatform(username);
-        if (existingPlayer) {
-            // Platform connection handling
-            if (origin) {
-                if (existingPlayer.platformData.platformId !== platformId) {
-                    console.log(`Duplicate platform detected for ${username}`);
-                    socket.emit("alert", "NewTab");
-                    socket.disconnect(true);
-                    return;
-                }
-                if (existingPlayer.platformData.socket && existingPlayer.platformData.socket.connected) {
-                    console.log(`Platform already connected for ${username}`);
-                    socket.emit("alert", "Platform already connected.");
-                    socket.disconnect(true);
-                    return;
-                }
-                console.log(`Reinitializing platform connection for ${username}`);
-                existingPlayer.initializePlatformSocket(socket);
-                existingPlayer.sendAlert(`Platform reconnected for ${username}`, false);
-                return;
-            }
-            // Game connection handling
-            if (gameId || !gameId) {
-                if (!existingPlayer.platformData.socket || !existingPlayer.platformData.socket.connected) {
-                    console.log("Platform connection required before joining a game.");
-                    socket.emit("internalError" /* messageType.ERROR */, "Platform connection required before joining a game.");
-                    socket.disconnect(true);
-                    return;
-                }
-                console.log("Game connection attempt detected, ensuring platform stability");
-                yield existingPlayer.updateGameSocket(socket);
-                existingPlayer.sendAlert(`Game initialized for ${username} in game ${gameId}`);
-                return;
-            }
-        }
-        // New platform connection
+    const username = decoded.username;
+    const platformId = socket.handshake.auth.platformId;
+    const origin = socket.handshake.auth.origin;
+    const gameId = socket.handshake.auth.gameId;
+    const { credits, status, managerName } = yield getPlayerDetails(username);
+    let existingPlayer = sessionManager_1.sessionManager.getPlayerPlatform(username);
+    if (existingPlayer) {
+        // Platform connection handling
         if (origin) {
-            const newUser = new Player_1.default(username, decoded.role, status, credits, userAgent, socket, managerName);
-            newUser.platformData.platformId = platformId;
-            newUser.sendAlert(`Player initialized for ${username} on platform ${origin}`, false);
+            if (existingPlayer.platformData.platformId !== platformId) {
+                console.log(`Duplicate platform detected for ${username}`);
+                socket.emit("alert", "NewTab");
+                socket.disconnect(true);
+                return;
+            }
+            if (existingPlayer.platformData.socket && existingPlayer.platformData.socket.connected) {
+                console.log(`Platform already connected for ${username}`);
+                socket.emit("alert", "Platform already connected.");
+                socket.disconnect(true);
+                return;
+            }
+            console.log(`Reinitializing platform connection for ${username}`);
+            existingPlayer.initializePlatformSocket(socket);
+            existingPlayer.sendAlert(`Platform reconnected for ${username}`, false);
             return;
         }
-        // Game connection without existing platform connection
-        if (process.env.NODE_ENV === "testing") {
-            console.log("Testing environment detected. Creating platform socket for the player.");
-            const mockPlatformSocket = {
-                handshake: { auth: { platformId: `test-platform-${username}` } },
-                connected: true,
-                emit: socket.emit.bind(socket),
-                disconnect: socket.disconnect.bind(socket),
-                on: socket.on.bind(socket),
-            };
-            const testPlayer = new Player_1.default(username, decoded.role, status, credits, userAgent, mockPlatformSocket, managerName);
-            testPlayer.platformData.platformId = `test-platform-${username}`;
-            yield testPlayer.updateGameSocket(socket);
+        // Game connection handling
+        if (gameId || !gameId) {
+            if (!existingPlayer.platformData.socket || !existingPlayer.platformData.socket.connected) {
+                console.log("Platform connection required before joining a game.");
+                socket.emit("internalError" /* messageType.ERROR */, "Platform connection required before joining a game.");
+                socket.disconnect(true);
+                return;
+            }
+            console.log("Game connection attempt detected, ensuring platform stability");
+            yield existingPlayer.updateGameSocket(socket);
+            existingPlayer.sendAlert(`Game initialized for ${username} in game ${gameId}`);
             return;
         }
-        // Invalid connection attempt
-        socket.emit("internalError" /* messageType.ERROR */, "Invalid connection attempt.");
-        // socket.disconnect(true);
     }
-    catch (error) {
-        console.error(`Error in handlePlayerConnection for user ${(decoded === null || decoded === void 0 ? void 0 : decoded.username) || 'unknown'}:`, error);
-        socket.emit("internalError" /* messageType.ERROR */, `Error in handlePlayerConnection for user ${(decoded === null || decoded === void 0 ? void 0 : decoded.username) || 'unknown'}:`, error);
-        socket.disconnect(true);
+    // New platform connection
+    if (origin) {
+        const newUser = new Player_1.default(username, decoded.role, status, credits, userAgent, socket, managerName);
+        newUser.platformData.platformId = platformId;
+        newUser.sendAlert(`Player initialized for ${username} on platform ${origin}`, false);
+        return;
     }
+    // Game connection without existing platform connection
+    if (process.env.NODE_ENV === "testing") {
+        console.log("Testing environment detected. Creating platform socket for the player.");
+        const mockPlatformSocket = {
+            handshake: { auth: { platformId: `test-platform-${username}` } },
+            connected: true,
+            emit: socket.emit.bind(socket),
+            disconnect: socket.disconnect.bind(socket),
+            on: socket.on.bind(socket),
+        };
+        const testPlayer = new Player_1.default(username, decoded.role, status, credits, userAgent, mockPlatformSocket, managerName);
+        testPlayer.platformData.platformId = `test-platform-${username}`;
+        yield testPlayer.updateGameSocket(socket);
+        return;
+    }
+    // Invalid connection attempt
+    socket.emit("internalError" /* messageType.ERROR */, "Invalid connection attempt.");
+    socket.disconnect(true);
 });
 const handleManagerConnection = (socket, decoded, userAgent) => __awaiter(void 0, void 0, void 0, function* () {
     const username = decoded.username;

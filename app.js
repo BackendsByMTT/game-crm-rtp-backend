@@ -17,6 +17,15 @@ const db_1 = __importDefault(require("./src/config/db"));
 const config_1 = require("./src/config/config");
 const startServer = () => __awaiter(void 0, void 0, void 0, function* () {
     yield (0, db_1.default)();
+    // const patforms = await Platform.find();
+    // for (const platform of patforms) {
+    //   let order = 1;
+    //   for (const game of platform.games) {
+    //     game.order = order++;
+    //   }
+    //   await platform.save();
+    //   console.log("Game order updated successfully");
+    // }
     server_1.default.listen(config_1.config.port, () => {
         console.log("Listening on port : ", config_1.config.port);
     });

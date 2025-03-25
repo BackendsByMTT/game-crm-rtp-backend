@@ -10,11 +10,29 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.addOrderToExistingGames = addOrderToExistingGames;
+const gameModel_1 = require("./gameModel");
 function addOrderToExistingGames() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
+            const platforms = yield gameModel_1.Platform.find(); // Fetch all platforms
+            for (const platform of platforms) {
+                if (platform.games && platform.games.length > 0) {
+                    platform.games = platform.games.map((game, index) => {
+                        // Only add the order field if it doesn't exist
+                        if (game.order === undefined || game.order === null) {
+                            return Object.assign(Object.assign({}, game), { order: index + 1 });
+                        }
+                        return game; // Keep existing order
+                    });
+                    yield platform.save(); // Save only if there are updates
+                }
+            }
+            console.log("✅ Order field added (if missing) to all games successfully!");
+            // mongoose.disconnect();
         }
         catch (error) {
+            console.error("❌ Error updating games:", error);
+            // mongoose.disconnect();
         }
     });
 }

@@ -405,7 +405,6 @@ function checkForWin(gameInstance) {
         }
         settings._winData.winningLines = [];
         settings._winData.winningSymbols = [];
-        gameInstance.playerData.currentWining = 0;
         return winningLines;
     }
     catch (error) {
