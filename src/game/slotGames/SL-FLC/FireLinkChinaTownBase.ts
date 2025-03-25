@@ -64,7 +64,7 @@ export class SLFLC {
         this.getRTP(response.data.spins || 1);
         break;
       case "FREESPINOPTION":
-        if (response.data.option>-1) {
+        if (response.data.option > -1) {
           console.log(response.data.option, "freespin option ")
 
           if (response.data.option >= this.settings.freespin.options.length ||
@@ -103,7 +103,7 @@ export class SLFLC {
       }
       //FIX: refactor
       let { currentBet } = this.settings;
-      if (this.settings.freespinCount <= 0 && this.settings.bonus.spinCount <= 0) {
+      if (this.settings.freespinCount <= 0 && this.settings.bonus.spinCount < 0) {
         this.playerData.totalbet += currentBet
         this.deductPlayerBalance(currentBet);
       }

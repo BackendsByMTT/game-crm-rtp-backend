@@ -275,10 +275,12 @@ export default class PlayerSocket {
       socket.disconnect(true);
       throw createHttpError(403, "Platform connection required before joining a game.");
     }
+    const MOBILE_USER_AGENT_REGEX = /android|iphone|ipad|ipod|mobile|okhttp/i;
+    const isMobile = this.playerData.userAgent ? MOBILE_USER_AGENT_REGEX.test(this.playerData.userAgent) : false;
 
     // Skip user-agent validation in the testing environment
     if (process.env.NODE_ENV !== "testing") {
-      if (socket.request.headers["user-agent"] !== this.playerData.userAgent) {
+      if (!isMobile && (socket.request.headers["user-agent"] !== this.playerData.userAgent)) {
         socket.emit("alert", {
           id: "AnotherDevice",
           message: "You are already playing on another browser",
@@ -289,11 +291,10 @@ export default class PlayerSocket {
     } else {
       console.log("Testing environment detected. Skipping user-agent validation.");
     }
-    console.log("Initializing game socket connection.");
+    socket.emit(messageType.ALERT, "Initializing game socket connection.");
 
     // Delay-based retry to ensure platform stability
     await new Promise(resolve => setTimeout(resolve, 500));
-
 
     console.log("Initializing game socket connection after platform stability confirmed.");
 

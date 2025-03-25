@@ -212,9 +212,13 @@ export function sendInitData(gameInstance: SLAOG) {
   UiInitData.paylines = convertSymbols(gameInstance.settings.Symbols);
   const reels = generateInitialReel(gameInstance.settings);
   gameInstance.settings.reels = reels;
+  let features = []
+  features.push(gameInstance.settings.smallWheelFeature.featureValues)
+  features.push(gameInstance.settings.mediumWheelFeature.featureValues)
+  features.push(gameInstance.settings.largeWheelFeature.featureValues)
   const dataToSend = {
     GameData: {
-      Reel: reels,
+      features,
       linesApiData: gameInstance.settings.currentGamedata.linesApiData,
       Bets: gameInstance.settings.currentGamedata.bets,
     },
