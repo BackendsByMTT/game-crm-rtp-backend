@@ -136,12 +136,13 @@ export default class PlayerSocket {
       this.platformData.socket = socket;
       this.platformData.platformId = socket.handshake.auth.platformId;
 
+      this.platformData.socket.on(Events.PLAYGROUND_GAME_URL, this.handleGetGameUrl.bind(this));
+      this.platformData.socket.on('pong', () => {
+        this.lastPing = new Date();
+      });
+
       this.messageHandler(false);
       this.onExit();
-
-      this.platformData.socket.on('pong', () => {
-        this.lastPing = new Date(); // Update the last response time
-      });
 
 
       if (this.platformData.socket) {
@@ -152,14 +153,10 @@ export default class PlayerSocket {
         console.error("Socket is null during initialization of disconnect event");
       }
 
-      // ✅ Restart the heartbeat every time a platform socket is initialized
       sessionManager.startSessionHeartbeat(this);
-
       this.sendData({ type: Events.PLAYGROUND_CREDITS, payload: { credits: this.playerData.credits } }, "platform")
 
-      // ✅ If the player was in a game, ensure the game socket is reinitialized
       if (this.currentGameData.gameId && !this.currentGameData.socket) {
-        console.log(`🔄 Reinitializing game socket for ${this.playerData.username}`);
         this.initializeGameSocket(socket);
       }
     } catch (error) {
@@ -192,8 +189,6 @@ export default class PlayerSocket {
   }
 
   private async initializeGameSocket(socket: Socket) {
-    console.log("INITAILZES GAME SOCKET : ", socket.connected)
-
     this.currentGameData.socket = socket;
     this.currentGameData.gameId = socket.handshake.auth.gameId;
     this.currentGameData.socket.on("disconnect", () => this.handleGameDisconnection());
@@ -362,6 +357,7 @@ export default class PlayerSocket {
           } else {
             // Handle platform-specific messages here if needed
             console.log(`Platform message received: ${response}`);
+          
           }
         } catch (error) {
           console.error("Failed to parse message:", error);
@@ -453,6 +449,39 @@ export default class PlayerSocket {
 
     this.sendData({ type: Events.PLAYGROUND_CREDITS, payload: { credits: this.playerData.credits } }, "platform");
 
+  }
+
+  private async handleGetGameUrl(data: { slug: string }, callback: Function) {
+    try {
+      const { slug } = data;
+
+      console.log("HANDLE GET GAME URL", slug)
+  
+      if (!slug) {
+        return callback({ success: false, message: "Game slug is required" });
+      }
+  
+      if (this.currentGameSession?.gameId) {
+        return callback({ success: false, message: "Already in an active game session" });
+      }
+  
+      const platform = await Platform.aggregate([
+        { $unwind: "$games" },
+        { $match: { "games.slug": slug, "games.status": "active" } },
+        { $project: { _id: 0, url: "$games.url", name: "$games.name" } }
+      ]);
+  
+      if (!platform.length) {
+        return callback({ success: false, message: "Game not found or inactive" });
+      }
+  
+      const game = platform[0];
+  
+      return callback({ success: true, data: { url: game.url, name: game.name || slug } });
+    } catch (error) {
+      console.error(`Error in PLAYGROUND_GAME_GET_URL for ${this.playerData.username}:`, error);
+      return callback({ success: false, message: "Internal error while fetching game URL" });
+    }
   }
 
 

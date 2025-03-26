@@ -17,6 +17,8 @@ import Transaction from "../transactions/transactionModel";
 import { IPlayer, IUser } from "./userType";
 import { sessionManager } from "../session/sessionManager";
 import { hasPermission, isAdmin } from "../../utils/permissions";
+import { redisClient } from "../../config/redis";
+import { Channels } from "../../utils/events";
 
 interface ActivePlayer {
   username: string;
@@ -152,23 +154,25 @@ export class UserController {
       }
 
       const isPasswordValid = await bcrypt.compare(password, user.password);
-
       if (!isPasswordValid) {
         throw createHttpError(401, "Invalid username or password");
       }
 
-      if (user.role === "player") {
-        await PlayerModel.updateOne(
-          { _id: user._id },
-          { $set: { lastLogin: new Date(), $inc: { loginTimes: 1 } } }
-        )
+      const redisSession = await redisClient.pubClient.hGetAll(Channels.PLAYGROUND(username));
+      if (redisSession?.sessionId && redisSession?.platformId) {
+        throw createHttpError(403, "User is already logged in on another browser or tab.");
       }
-      else {
-        await User.updateOne(
-          { _id: user._id },
-          {
-            $set: { lastLogin: new Date(), $inc: { loginTimes: 1 } }
-          });
+
+      // Update login metadata
+      const updateData = {
+        $set: { lastLogin: new Date() },
+        $inc: { loginTimes: 1 },
+      };
+
+      if (user.role === "player") {
+        await PlayerModel.updateOne({ _id: user._id }, updateData);
+      } else {
+        await User.updateOne({ _id: user._id }, updateData);
       }
 
       const token = jwt.sign(
@@ -177,22 +181,6 @@ export class UserController {
         { expiresIn: "7d" }
       );
 
-      // res.cookie("userToken", token, {
-      //   maxAge: 1000 * 60 * 60 * 24 * 7,
-      //   httpOnly: true,
-      //   sameSite: "none",
-      // });
-
-
-      const socketUser = await sessionManager.getPlaygroundUser(username);
-
-      if (socketUser?.platformData.socket?.connected || socketUser?.currentGameData.socket) {
-        throw createHttpError(403, "Already logged in on another browser or tab.");
-      }
-
-      if (socketUser?.currentGameData.socket) {
-        throw createHttpError(403, "You Are Already Playing on another browser or tab.");
-      }
 
       res.status(200).json({
         message: "Login successful",
@@ -214,10 +202,16 @@ export class UserController {
         throw createHttpError(400, "Username is required");
       }
 
-      // TODO: we have to change this according to redis
-      const platformSession = await sessionManager.getPlaygroundUser(username);
+      const platformSession = sessionManager.getPlaygroundUser(username);
       if (platformSession) {
         await platformSession.cleanupPlatformSocket()
+      } else {
+        const redisSession = await redisClient.pubClient.hGetAll(Channels.PLAYGROUND(username));
+        if (redisSession?.sessionId) {
+          await sessionManager.endSession(username);
+        } else {
+          console.warn(`⚠️ No session found in Redis or memory for ${username}`);
+        }
       }
 
       res.clearCookie("token");
