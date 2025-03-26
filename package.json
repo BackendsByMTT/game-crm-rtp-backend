@@ -47,7 +47,7 @@
   },
   "scripts": {
     "build": "tsc && ts-node copy-static-assets.ts",
-  "start": "node dist/app.js",
+  "start": "node app.js",
     "dev": "tsc-watch --onSuccess \"nodemon dist/app.js\""
   }
 }
