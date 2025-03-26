@@ -46,8 +46,8 @@
     "typescript": "^5.4.5"
   },
   "scripts": {
-    "start": "node app.js",
-    "dev": "tsc-watch --onSuccess \"nodemon dist/app.js\"",
-    "build": "tsc && node copyStaticAsset.js"
+    "build": "tsc && ts-node copy-static-assets.ts",
+  "start": "node dist/app.js",
+    "dev": "tsc-watch --onSuccess \"nodemon dist/app.js\""
   }
 }

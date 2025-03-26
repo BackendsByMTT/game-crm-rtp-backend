@@ -18,28 +18,26 @@ import sessionRoutes from './src/dashboard/session/sessionRoutes';
 import { setupWebSocket } from './src/server';
 import connectDB from './src/config/db';
 import globalErrorHandler from './src/dashboard/middleware/globalHandler';
-
+import path from 'path';
 
 const app = express();
 
-// CORS for WebSockets and Express API//
+// CORS
 const corsOptions = {
   origin: config.allowedOrigins,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], // Allow only major HTTP methods
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'], // Allow essential headers
-  credentials: true // Allow cookies and Authorization headers
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true
 };
 
-// Middleware
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cors(corsOptions));
 
-
-// Health check endpoint
-app.get('/health', async (req, res) => {
+// Health check
+app.get('/', async (req, res) => {
   const healthInfo = {
-    status: 'Healthy', // Professional yet clear
+    status: 'Healthy',
     uptime: `${Math.floor(process.uptime() / 60)} minutes`,
     timestamp: new Date().toLocaleString(),
     memoryUsage: {
@@ -56,7 +54,7 @@ app.get('/health', async (req, res) => {
       architecture: os.arch(),
       nodeVersion: process.version
     },
-    workers: cluster.isWorker ? `Worker ID: ${cluster.worker.id}` : 'Master Process',
+    workers: cluster.isWorker ? `Worker ID: ${cluster.worker?.id}` : 'Master Process',
     database: {
       status: mongoose.connection.readyState === 1 ? 'Connected' : 'Not Connected',
       host: mongoose.connection.host
@@ -67,37 +65,37 @@ app.get('/health', async (req, res) => {
   res.json(healthInfo);
 });
 
-
-// Serve static files
-app.use(express.static('public'));
+// Serve static index.html on /play
+app.get('/play', (req, res) => {
+  res.sendFile(path.join(__dirname, 'src', 'public', 'index.html'));
+});
 
 // API routes
 app.use('/api/company', adminRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/transactions", transactionRoutes);
-app.use("/api/games", gameRoutes);
-app.use("/api/payouts", checkUser, checkRole(["admin"]), payoutRoutes);
-app.use("/api/toggle", checkUser, checkRole(["admin"]), toggleRoutes);
-app.use("/api/session", sessionRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/transactions', transactionRoutes);
+app.use('/api/games', gameRoutes);
+app.use('/api/payouts', checkUser, checkRole(['admin']), payoutRoutes);
+app.use('/api/toggle', checkUser, checkRole(['admin']), toggleRoutes);
+app.use('/api/session', sessionRoutes);
 
-// Serve the HTML file for the frontend
-app.get('/', (req, res) => {
-  res.sendFile('index.html', { root: './' });
-});
+// Serve static files
+app.use(express.static(path.join(__dirname, 'src', 'public'), { index: false }));
 
+// Global error handler
 app.use(globalErrorHandler);
 
-// Connect Mongodb before starting the server
+// Start server with sticky session
 connectDB().then(() => {
   const server = createServer(app);
   if (!sticky.listen(server, Number(config.port))) {
-    // Master Process
-    server.once("listening", () => console.log(`🚀 Server started on port ${config.port}`));
+    server.once('listening', () => {
+      console.log(`🚀 Master process started on port ${config.port}`);
+    });
   } else {
-    // Worker Process (WebSocket Handling)
     setupWebSocket(server, corsOptions);
   }
 }).catch((err) => {
-  console.error("❌ Failed to connect to database:", err);
+  console.error('❌ Failed to connect to database:', err);
   process.exit(1);
 });
