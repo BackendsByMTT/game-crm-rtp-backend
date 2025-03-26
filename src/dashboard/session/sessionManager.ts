@@ -310,7 +310,7 @@ class SessionManager {
     public endGame = async (username: string) => {
         try {
             console.log(`🔍 Checking endGame() call for ${username}`);
-            console.trace(); // Logs the full stack trace
+
 
             const player = this.playground.get(username);
             if (!player || !player.currentGameSession) {
