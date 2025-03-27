@@ -79,7 +79,7 @@ class SessionManager {
             // ⚠️ Prevent duplicate sessions
             if (this.playground.has(username)) {
                 socket.emit("error", "Player session already exists");
-                socket.disconnect();
+
                 return;
             }
 

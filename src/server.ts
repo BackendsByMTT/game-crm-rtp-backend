@@ -10,118 +10,104 @@ import { Channels } from "./utils/events";
 
 
 export async function setupWebSocket(server: any, corsOptions: any) {
-    const io = new Server(server, { cors: corsOptions });
-    io.use(socketAuth);
-
     try {
+        const io = new Server(server, { cors: corsOptions });
+        io.use(socketAuth);
+
         await redisClient.connect();
-    } catch (error) {
-        console.error("❌ Redis connection error:", error);
-        process.exit(1);
-    }
 
-    io.adapter(createAdapter(redisClient.pubClient, redisClient.subClient));
+        io.adapter(createAdapter(redisClient.pubClient, redisClient.subClient));
 
-    const namespaces = {
-        playground: io.of("/playground"),
-        control: io.of("/control"),
-        game: io.of("/game")
-    };
+        const namespaces = {
+            playground: io.of("/playground"),
+            control: io.of("/control"),
+            game: io.of("/game")
+        };
 
-    Object.values(namespaces).forEach((ns) => ns.use(socketAuth));
+        Object.values(namespaces).forEach((ns) => ns.use(socketAuth));
 
-    // ✅ Playground Namespace (For Players)
-    namespaces.playground.on("connection", async (socket) => {
-        const { username, role } = socket.data.user;
-        const userAgent = socket.handshake.headers["user-agent"];
-        const playgroundId = socket.handshake.auth.playgroundId;
+        // ✅ Playground Namespace (For Players)
+        namespaces.playground.on("connection", async (socket) => {
+            const { username, role } = socket.data.user;
+            const userAgent = socket.handshake.headers["user-agent"];
+            const playgroundId = socket.handshake.auth.playgroundId;
 
-        if (role !== "player") {
-            socket.disconnect();
-            return;
-        }
-
-        if (!playgroundId) {
-            this.disconnectWithError(socket, "No playgroundId provided.");
-            return;
-        }
-
-        let existingSession = sessionManager.getPlaygroundUser(username)
-        if (existingSession) {
-            if (existingSession.platformData.socket.connected) {
-                if (existingSession.platformData.platformId === playgroundId) {
-                    this.disconnectWithError(socket, "Already connected in Playground.");
-                    return;
-                }
-                this.disconnectWithError(socket, "Cannot connect to multiple Playgrounds simultaneously.");
+            if (role !== "player") {
+                socket.disconnect();
                 return;
             }
 
-            // 🔄 Restore session from memory
-            console.log(`🔄 Restoring session from memory for ${username}`);
-            existingSession.initializePlatformSocket(socket);
-            return;
-        }
+            if (!playgroundId) {
+                this.disconnectWithError(socket, "No playgroundId provided.");
+                return;
+            }
 
-        const redisSession = await redisClient.pubClient.hGetAll(Channels.PLAYGROUND(username));
-        if (redisSession && Object.keys(redisSession).length > 0) {
-            console.log(`🔄 Restoring session from Redis for ${username}`);
-            const restoredSession = await sessionManager.restoreSessionFromRedis(redisSession, socket);
-            if (restoredSession) return;
-        }
+            let existingSession = sessionManager.getPlaygroundUser(username);
+            if (existingSession) {
+                if (existingSession.platformData.socket.connected) {
+                    if (existingSession.platformData.platformId === playgroundId) {
+                        this.disconnectWithError(socket, "Already connected in Playground.");
+                        return;
+                    }
+                    // this.disconnectWithError(socket, "Cannot connect to multiple Playgrounds simultaneously.");
+socket.emit('alert',"NewTab")
+                    return;
+                }
 
-        await sessionManager.startSession(username, role, userAgent, socket)
+                // 🔄 Restore session from memory
+                console.log(`🔄 Restoring session from memory for ${username}`);
+                existingSession.initializePlatformSocket(socket);
+                return;
+            }
 
-    });
+            const redisSession = await redisClient.pubClient.hGetAll(Channels.PLAYGROUND(username));
+            if (redisSession && Object.keys(redisSession).length > 0) {
+                console.log(`🔄 Restoring session from Redis for ${username}`);
+                const restoredSession = await sessionManager.restoreSessionFromRedis(redisSession, socket);
+                if (restoredSession) return;
+            }
 
-    // Game Namespace (For Players)
-    namespaces.game.on("connection", async (socket) => {
-        const { username } = socket.data.user;
-        const gameId = socket.handshake.auth.gameId;
+            await sessionManager.startSession(username, role, userAgent, socket);
+        });
 
-        // 🔍 Ensure player is connected to the Playground first
-        // let existingSession = await sessionManager.getPlaygroundUser(username);
-        // if (!existingSession || !existingSession.platformData?.socket.connected) {
-        //     return disconnectWithError(socket, "You must be connected to the Playground first.");
-        // }
+        // 🎮 Game Namespace (For Players)
+        namespaces.game.on("connection", async (socket) => {
+            const { username } = socket.data.user;
+            const gameId = socket.handshake.auth.gameId;
 
-        // // 🔍 Check if player is already in a game
-        // if (existingSession.currentGameSession) {
-        //     console.log(`⚠️ Player ${username} is already in a game: ${existingSession.currentGameData.gameId}`);
-        //     return disconnectWithError(socket, "You are already playing a game. Finish your current session first.");
-        // }
+            // 🚀 Start game session
+            console.log(`🎰 Player ${username} entering game: ${gameId}`);
+            await sessionManager.startGame(username, gameId, socket);
+        });
 
-        // 🚀 Start game session
-        console.log(`🎰 Player ${username} entering game: ${gameId}`);
-        await sessionManager.startGame(username, gameId, socket);
-    });
+        // 🛠️ Control Namespace (For Managers)
+        namespaces.control.on("connection", async (socket) => {
+            const { username, role } = socket.data.user;
+            const userAgent = socket.handshake.headers["user-agent"];
 
-    // Control Namespace (For Managers)
-    namespaces.control.on("connection", async (socket) => {
-        const { username, role } = socket.data.user;
-        const userAgent = socket.handshake.headers["user-agent"];
+            let existingManager = sessionManager.getControlUser(username);
+            if (existingManager) {
+                console.log(`🔄 Restoring control session from memory for ${username}`);
+                existingManager.initializeManagerSocket(socket);
+                return;
+            }
 
-        // 🔍 Check if the manager already exists in memory
-        let existingManager = sessionManager.getControlUser(username);
-        if (existingManager) {
-            console.log(`🔄 Restoring control session from memory for ${username}`);
-            existingManager.initializeManagerSocket(socket);
-            return;
-        }
+            const redisSession = await redisClient.pubClient.hGetAll(Channels.CONTROL(role, username));
+            if (redisSession && Object.keys(redisSession).length > 0) {
+                console.log(`🔄 Restoring control session from Redis for ${username}`);
+                const restoredManager = await sessionManager.restoreControlUserFromRedis(redisSession, socket);
+                if (restoredManager) return;
+            }
 
-        // 🔍 Check if manager session exists in Redis
-        const redisSession = await redisClient.pubClient.hGetAll(Channels.CONTROL(role, username));
-        if (redisSession && Object.keys(redisSession).length > 0) {
-            console.log(`🔄 Restoring control session from Redis for ${username}`);
-            const restoredManager = await sessionManager.restoreControlUserFromRedis(redisSession, socket);
-            if (restoredManager) return;
-        }
+            await sessionManager.addControlUser(username, role, socket);
+        });
 
-        // 🚀 Create a new manager session
-        await sessionManager.addControlUser(username, role, socket);
-
-    });
+    } catch (error) {
+        console.error("❌ Error setting up WebSocket:", error);
+        process.exit(1);
+    }
 }
+
 
 
 function disconnectWithError(socket: any, message: string) {
