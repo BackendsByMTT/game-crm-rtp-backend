@@ -66,10 +66,10 @@ app.get('/', async (req, res) => {
 });
 
 // Serve static index.html on /play
-app.get('/play', (req, res) => {
-  res.sendFile(path.join(__dirname, 'src', 'public', 'index.html'));
-});
-
+// app.get('/play', (req, res) => {
+//   res.sendFile(path.join(__dirname, 'src', 'public', 'index.html'));
+// });
+// 
 // API routes
 app.use('/api/company', adminRoutes);
 app.use('/api/users', userRoutes);
@@ -80,7 +80,7 @@ app.use('/api/toggle', checkUser, checkRole(['admin']), toggleRoutes);
 app.use('/api/session', sessionRoutes);
 
 // Serve static files
-app.use(express.static(path.join(__dirname, 'src', 'public'), { index: false }));
+// app.use(express.static(path.join(__dirname, 'src', 'public'), { index: false }));
 
 // Global error handler
 app.use(globalErrorHandler);
