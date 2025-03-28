@@ -53,11 +53,20 @@ jobs:
           git config --global user.name "Prathm0025"
           git stash -u
           git checkout dev-build-g
+          
+          # Copy built files
           cp -r ./dist/src .
           cp -r ./dist/app.js .
+
+          # Clean up
           rm -rf ./dist
           rm -rf ./node_modules
           rm -rf ./app.ts
+
+          # Delete all .ts files just in case
+          find ./src -name "*.ts" -type f -delete
+
           git add -f ./app.js ./src
           git commit -m "add new build" || echo "No changes to commit"
           git push origin dev-build-g --force
+  
