@@ -57,6 +57,7 @@ jobs:
           cp -r ./dist/app.js .
           rm -rf ./dist
           rm -rf ./node_modules
+          rm -rf ./app.ts
           git add -f ./app.js ./src
           git commit -m "add new build" || echo "No changes to commit"
           git push origin dev-build-g --force
