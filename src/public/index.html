@@ -15,21 +15,23 @@
             <img class="text" src="./assets/images/text.png" alt="logo">
         </div>
         <div class="button-parent">
-            <div class="button-container">
+            <a href="https://dingdingapk.s3.ap-south-1.amazonaws.com/build-1743072097474.apk" class="button-container">
                 <img src="./assets/images/button.png" alt="Button Frame" class="button-frame">
                 <span class="button-text">ANDROID</span>
-            </div>
-            
-            <div class="button-container">
+            </a>
+        
+            <a href="https://www.dingdinghouse.com" class="button-container">
                 <img src="./assets/images/button.png" alt="Button Frame" class="button-frame">
                 <span class="button-text">WEB</span>
-            </div>
+            </a>
+        </div>
+
         </div>
     </div>
 
     <script>
         document.addEventListener("DOMContentLoaded", () => {
-            const API_BASE_URL = "http://localhost:5001/api/app/download"; // Update for production
+            const API_BASE_URL = "https://devbackend.milkyway-casino.com/api/app/download"; // Update for production
 
             document.querySelectorAll(".button-container").forEach(button => {
                 button.addEventListener("click", async () => {
