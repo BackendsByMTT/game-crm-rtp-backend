@@ -203,7 +203,7 @@ export const gameData = [
           "4": 9,
         },
         description:
-          "Activates 3, 5, or 10 free spins when 3, 4, or 5 symbols appear anywhere on the result matrix.",
+          "Scatter may appear at any position.\n God of Fortune will appear randomly and give GoldWild on 1st to 3rd reel by chance.\n God of Fortune will appear randomly and give GoldWild. It will unfold and become a roll of 3 WILD.\n 3 or more Scatter in a game during the free game, the times of free spin will be added according to the rule of Free Game.",
         useWildSub: false,
         multiplier: [
           [0, 10],

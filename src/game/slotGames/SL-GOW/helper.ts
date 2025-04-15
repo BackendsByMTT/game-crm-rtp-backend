@@ -165,7 +165,8 @@ export function checkForWin(gameInstance: SLGOW) {
             symbolMultiplierLTR * gameInstance.settings.BetPerLines;
           totalPayout += payout;
           gameInstance.playerData.currentWining += payout;
-          settings._winData.winningLines.push(index + 1);
+          settings._winData.winningLines.push(index);
+          // settings._winData.winningLines.push(index + 1);
           winningLines.push({
             line,
             symbol: firstSymbolLTR,
@@ -211,7 +212,8 @@ export function checkForWin(gameInstance: SLGOW) {
             symbolMultiplierRTL * gameInstance.settings.BetPerLines;
           totalPayout += payout;
           gameInstance.playerData.currentWining += payout;
-          settings._winData.winningLines.push(index + 1);
+          settings._winData.winningLines.push(index);
+          // settings._winData.winningLines.push(index + 1);
           winningLines.push({
             line,
             symbol: firstSymbolRTL,
@@ -291,12 +293,14 @@ function checkLineSymbols(
 ): CheckLineResult {
   try {
     const { settings } = gameInstance;
-    const wildSymbol =
-      settings.blueWild.SymbolID || settings.goldWild.SymbolID || "";
+    const wildSymbols = [
+      settings.blueWild.SymbolID,
+      settings.goldWild.SymbolID,
+    ];
     let matchCount = 1;
     let currentSymbol = firstSymbol;
 
-    let isWild = firstSymbol === wildSymbol;
+    let isWild = wildSymbols.includes(parseInt(currentSymbol));
 
     const matchedIndices: MatchedIndex[] = [];
     const start = direction === "LTR" ? 0 : line.length - 1;
@@ -309,12 +313,7 @@ function checkLineSymbols(
       const rowIndex = line[i];
       const symbol = settings.resultSymbolMatrix[rowIndex][i];
 
-      if (symbol === wildSymbol) {
-        isWild = true;
-      }
-
       if (symbol === undefined) {
-        // console.error(`Symbol at position [${rowIndex}, ${i}] is undefined.`);
         return {
           isWinningLine: false,
           matchCount: 0,
@@ -323,12 +322,32 @@ function checkLineSymbols(
         };
       }
 
+      const isWildSymbol = wildSymbols.includes(parseInt(symbol));
+
+      // Allow wilds at the start of the line to act as matching symbols
+      if (isWildSymbol && i === start) {
+        const nonWildSymbol = findFirstNonWildSymbol(
+          line,
+          gameInstance,
+          direction,
+        );
+        if (nonWildSymbol) {
+          currentSymbol = nonWildSymbol; // Treat the first non-wild symbol as the current symbol
+        }
+        continue;
+      }
+
+      // Process wilds normally if they are in the middle or at the end of the line
+      if (isWildSymbol) {
+        isWild = true;
+      }
+
       switch (true) {
-        case symbol === currentSymbol || symbol === wildSymbol:
+        case symbol === currentSymbol || isWildSymbol:
           matchCount++;
           matchedIndices.push({ col: i, row: rowIndex });
           break;
-        case currentSymbol === wildSymbol:
+        case wildSymbols.includes(parseInt(currentSymbol)):
           currentSymbol = symbol;
           matchCount++;
           matchedIndices.push({ col: i, row: rowIndex });
@@ -359,6 +378,84 @@ function checkLineSymbols(
   }
 }
 
+// function checkLineSymbols(
+//   firstSymbol: string,
+//   line: number[],
+//   gameInstance: SLGOW,
+//   direction: "LTR" | "RTL" = "LTR",
+// ): CheckLineResult {
+//   try {
+//     const { settings } = gameInstance;
+//     const wildSymbols = [
+//       settings.blueWild.SymbolID,
+//       settings.goldWild.SymbolID,
+//     ];
+//     let matchCount = 1;
+//     let currentSymbol = firstSymbol;
+//
+//     let isWild = wildSymbols.includes(parseInt(currentSymbol));
+//
+//     const matchedIndices: MatchedIndex[] = [];
+//     const start = direction === "LTR" ? 0 : line.length - 1;
+//     const end = direction === "LTR" ? line.length : -1;
+//     const step = direction === "LTR" ? 1 : -1;
+//
+//     matchedIndices.push({ col: start, row: line[start] });
+//
+//     for (let i = start + step; i !== end; i += step) {
+//       const rowIndex = line[i];
+//       const symbol = settings.resultSymbolMatrix[rowIndex][i];
+//
+//       if (wildSymbols.includes(parseInt(symbol))) {
+//         isWild = true;
+//       }
+//
+//       if (symbol === undefined) {
+//         // console.error(`Symbol at position [${rowIndex}, ${i}] is undefined.`);
+//         return {
+//           isWinningLine: false,
+//           matchCount: 0,
+//           matchedIndices: [],
+//           isWild,
+//         };
+//       }
+//
+//       switch (true) {
+//         case symbol === currentSymbol || wildSymbols.includes(parseInt(symbol)):
+//           matchCount++;
+//           matchedIndices.push({ col: i, row: rowIndex });
+//           break;
+//         case wildSymbols.includes(parseInt(currentSymbol)):
+//           currentSymbol = symbol;
+//           matchCount++;
+//           matchedIndices.push({ col: i, row: rowIndex });
+//           break;
+//         default:
+//           return {
+//             isWinningLine: matchCount >= 3,
+//             matchCount,
+//             matchedIndices,
+//             isWild,
+//           };
+//       }
+//     }
+//     return {
+//       isWinningLine: matchCount >= 3,
+//       matchCount,
+//       matchedIndices,
+//       isWild,
+//     };
+//   } catch (error) {
+//     console.error("Error in checkLineSymbols:", error);
+//     return {
+//       isWinningLine: false,
+//       matchCount: 0,
+//       matchedIndices: [],
+//       isWild: false,
+//     };
+//   }
+// }
+
 //checking first non wild symbol in lines which start with wild symbol
 function findFirstNonWildSymbol(
   line: number[],
@@ -366,8 +463,7 @@ function findFirstNonWildSymbol(
   direction: "LTR" | "RTL" = "LTR",
 ) {
   const { settings } = gameInstance;
-  const blueWildSymbol = settings.blueWild.SymbolID;
-  const goldWildSymbol = settings.goldWild.SymbolID;
+  const wildSymbols = [settings.blueWild.SymbolID, settings.goldWild.SymbolID];
   const start = direction === "LTR" ? 0 : line.length - 1;
   const end = direction === "LTR" ? line.length : -1;
   const step = direction === "LTR" ? 1 : -1;
@@ -375,11 +471,11 @@ function findFirstNonWildSymbol(
   for (let i = start; i !== end; i += step) {
     const rowIndex = line[i];
     const symbol = settings.resultSymbolMatrix[rowIndex][i];
-    if (symbol !== blueWildSymbol && symbol !== goldWildSymbol) {
+    if (!wildSymbols.includes(symbol)) {
       return symbol;
     }
   }
-  return blueWildSymbol;
+  return null;
 }
 
 //payouts to user according to symbols count in matched lines
