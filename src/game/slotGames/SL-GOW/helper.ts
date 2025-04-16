@@ -475,6 +475,7 @@ export function sendInitData(gameInstance: SLGOW) {
       Reel: reels,
       Lines: gameInstance.settings.currentGamedata.linesApiData,
       Bets: gameInstance.settings.currentGamedata.bets,
+      FeatureMults: gameInstance.settings.featureAllMult,
     },
     UIData: UiInitData,
     PlayerData: {
