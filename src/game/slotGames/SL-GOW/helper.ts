@@ -18,12 +18,12 @@ export function initializeGameSettings(gameData: any, gameInstance: SLGOW) {
     id: gameData.gameSettings.id,
     matrix: gameData.gameSettings.matrix,
     bets: gameData.gameSettings.bets,
-    // Symbols: gameInstance.initSymbols,
-    // resultSymbolMatrix: [],
-    // currentGamedata: gameData.gameSettings,
-    // lineData: [],
-    // _winData: new WinData(gameInstance),
-    // currentBet: 0,
+    Symbols: gameInstance.initSymbols,
+    resultSymbolMatrix: [],
+    currentGamedata: gameData.gameSettings,
+    lineData: [],
+    _winData: new WinData(gameInstance),
+    currentBet: 0,
     currentLines: 0,
     BetPerLines: 0,
     reels: [],
@@ -46,10 +46,6 @@ export function initializeGameSettings(gameData: any, gameInstance: SLGOW) {
     },
     gamble: {
       isEnabled: gameData.gameSettings.gamble.isEnabled,
-    },
-    coin: {
-      SymbolName: "",
-      SymbolID: -1,
     },
     blueWild: {
       SymbolName: "",
@@ -89,7 +85,7 @@ export function generateInitialReel(gameSettings: any): string[][] {
 
 export function makePayLines(gameInstance: SLGOW) {
   const { settings } = gameInstance;
-  settings.currentGamedata.Symbols.forEach((element) => {
+  settings.Symbols.forEach((element) => {
     if (!element.useWildSub) {
       handleSpecialSymbols(element, gameInstance);
     }
@@ -97,34 +93,46 @@ export function makePayLines(gameInstance: SLGOW) {
 }
 
 function handleSpecialSymbols(symbol: any, gameInstance: SLGOW) {
-  switch (symbol.Name) {
-    case specialIcons.blueWild:
-      gameInstance.settings.blueWild.SymbolName = symbol.Name;
-      gameInstance.settings.blueWild.SymbolID = symbol.Id;
-      break;
-    case specialIcons.goldWild:
-      gameInstance.settings.goldWild.SymbolName = symbol.Name;
-      gameInstance.settings.goldWild.SymbolID = symbol.Id;
-      break;
-    case specialIcons.freeSpin:
-      gameInstance.settings.freeSpin.SymbolName = symbol.Name;
-      gameInstance.settings.freeSpin.SymbolID = symbol.Id;
-      break;
+  try {
+    switch (symbol.Name) {
+      case specialIcons.blueWild:
+        gameInstance.settings.blueWild.SymbolName = symbol.Name;
+        gameInstance.settings.blueWild.SymbolID = symbol.Id;
+        break;
+      case specialIcons.goldWild:
+        gameInstance.settings.goldWild.SymbolName = symbol.Name;
+        gameInstance.settings.goldWild.SymbolID = symbol.Id;
+        break;
+      case specialIcons.freeSpin:
+        gameInstance.settings.freeSpin.SymbolName = symbol.Name;
+        gameInstance.settings.freeSpin.SymbolID = symbol.Id;
+        break;
 
-    case specialIcons.coin:
-      gameInstance.settings.freeSpin.SymbolName = symbol.Name;
-      gameInstance.settings.freeSpin.SymbolID = symbol.Id;
-      break;
-    default:
+      case specialIcons.coin:
+        gameInstance.settings.freeSpin.SymbolName = symbol.Name;
+        gameInstance.settings.freeSpin.SymbolID = symbol.Id;
+        break;
+      default:
+    }
+  } catch (e: any) {
+    console.log("error in handleSpecialSymbols", e);
   }
 }
 
-function checkForfeatureAll(inst: SLGOW) {
+function checkForfeatureAll(inst: SLGOW): { found: boolean; sym: number } {
   try {
     const { settings } = inst;
     let foundSymbol = -1;
-    settings.resultSymbolMatrix.forEach((row, rowIndex) => {
-      row.forEach((symbol, colIndex) => {
+
+    for (
+      let rowIndex = 0;
+      rowIndex < settings.resultSymbolMatrix.length;
+      rowIndex++
+    ) {
+      const row = settings.resultSymbolMatrix[rowIndex];
+      for (let colIndex = 0; colIndex < row.length; colIndex++) {
+        const symbol = row[colIndex];
+
         if (
           symbol == settings.blueWild.SymbolID ||
           symbol == settings.goldWild.SymbolID
@@ -135,17 +143,18 @@ function checkForfeatureAll(inst: SLGOW) {
           if (foundSymbol == -1) {
             foundSymbol = symbol;
           } else if (foundSymbol != symbol) {
-            // console.log("fetall", false);
+            console.log("fetall", false);
             return { found: false, sym: foundSymbol };
           }
         }
-      });
-    });
-    // console.log("fetall", true);
+      }
+    }
 
+    console.log("fetall", true);
     return { found: true, sym: foundSymbol };
   } catch (e: any) {
     console.log("error in checkForfeatureAll", e);
+    return { found: false, sym: -1 }; // Important: Return a default value in case of error
   }
 }
 
@@ -599,7 +608,7 @@ export function makeResultJson(gameInstance: SLGOW) {
         haveWon: playerData.haveWon,
       },
     };
-    // console.info("ResultData", JSON.stringify(sendData.GameData));
+    console.info("ResultData", JSON.stringify(sendData));
 
     gameInstance.sendMessage("ResultData", sendData);
   } catch (error) {

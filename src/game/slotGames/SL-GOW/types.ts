@@ -6,6 +6,8 @@ interface Symbol {
   Id: number;
   payout: number;
   reelInstance: { [key: string]: number };
+  multiplier: number[][];
+  useWildSub: boolean;
 }
 export interface SLGOWSETTINGS {
   id: string;
@@ -35,10 +37,6 @@ export interface SLGOWSETTINGS {
   };
   gamble: {
     isEnabled: boolean;
-  };
-  coin: {
-    SymbolName: string;
-    SymbolID: number;
   };
   blueWild: {
     SymbolName: string;
