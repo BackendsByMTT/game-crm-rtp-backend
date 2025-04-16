@@ -24,8 +24,8 @@ export const gameData = [
     featureAllMult: [5000, 2500, 1000, 500, 400, 250, 150, 100, 666], //8 + 1 (wild) symbols
     freeSpin: {
       isEnabled: true,
-      goldRowCountProb: [1, 1, 1], // 0 row, 1 row , 2 rows
-      goldRowsProb: [1, 1, 1, 1, 1], // 0th row gold, 1st row gold, 2nd row gold, 3rd row gold, 4th row gold
+      goldColCountProb: [1, 1, 1], // 0 row, 1 row , 2 rows
+      goldColProb: [1, 1, 1, 1, 1], // 0th row gold, 1st row gold, 2nd row gold, 3rd row gold, 4th row gold
     },
     Symbols: [
       {

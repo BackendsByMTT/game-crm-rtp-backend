@@ -32,8 +32,8 @@ export interface SLGOWSETTINGS {
     isTriggered: boolean;
     freeSpinCount: number;
     countIncrement: number[];
-    goldRowCountProb: number[]; // 0 row, 1 row , 2 rows
-    goldRowsProb: number[]; // 0th row gold, 1st row gold, 2nd row gold, 3rd row gold, 4th row gold
+    goldColCountProb: number[]; // 0 row, 1 row , 2 rows
+    goldColProb: number[]; // 0th row gold, 1st row gold, 2nd row gold, 3rd row gold, 4th row gold
   };
   gamble: {
     isEnabled: boolean;
@@ -45,7 +45,7 @@ export interface SLGOWSETTINGS {
   goldWild: {
     SymbolName: string;
     SymbolID: number;
-    rows: number[];
+    cols: number[];
   };
 }
 
@@ -53,5 +53,4 @@ export enum specialIcons {
   blueWild = "BlueWild",
   goldWild = "GoldWild",
   freeSpin = "Scatter",
-  coin = "Coin",
 }

@@ -36,8 +36,8 @@ export function initializeGameSettings(gameData: any, gameInstance: SLGOW) {
       isEnabled: gameData.gameSettings.freeSpin.isEnabled,
       isFreeSpin: false,
       isTriggered: false,
-      goldRowsProb: gameData.gameSettings.freeSpin.goldRowsProb,
-      goldRowCountProb: gameData.gameSettings.freeSpin.goldRowCountProb,
+      goldColProb: gameData.gameSettings.freeSpin.goldRowsProb,
+      goldColCountProb: gameData.gameSettings.freeSpin.goldRowCountProb,
       countIncrement: gameData.gameSettings.Symbols.find(
         (s: any) => s.Name === specialIcons.freeSpin,
       )
@@ -54,7 +54,7 @@ export function initializeGameSettings(gameData: any, gameInstance: SLGOW) {
     goldWild: {
       SymbolName: "",
       SymbolID: -1,
-      rows: [],
+      cols: [],
     },
   };
 }
@@ -108,10 +108,6 @@ function handleSpecialSymbols(symbol: any, gameInstance: SLGOW) {
         gameInstance.settings.freeSpin.SymbolID = symbol.Id;
         break;
 
-      case specialIcons.coin:
-        gameInstance.settings.freeSpin.SymbolName = symbol.Name;
-        gameInstance.settings.freeSpin.SymbolID = symbol.Id;
-        break;
       default:
     }
   } catch (e: any) {
@@ -492,6 +488,8 @@ export function sendInitData(gameInstance: SLGOW) {
 }
 
 function getRandomFromProbability(probArray: number[]): number {
+  console.log("probArr:", probArray.length, probArray);
+
   try {
     const totalProb = probArray.reduce((sum, p) => sum + p, 0);
     const randValue = Math.random() * totalProb;
@@ -506,45 +504,44 @@ function getRandomFromProbability(probArray: number[]): number {
 
     return probArray.length;
   } catch (e) {
+    console.log("probArr:", probArray.length, probArray);
     console.log("error in getRandomFromProbability", e);
   }
 }
 
 function handleFreeSpin(gameInstance: SLGOW) {
   try {
-    const goldRowCount =
-      getRandomFromProbability(
-        gameInstance.settings.freeSpin.goldRowCountProb,
-      ) - 1;
-    let goldRows = [];
-    for (let i = 0; i < goldRowCount; i++) {
-      goldRows.push(
-        getRandomFromProbability(gameInstance.settings.freeSpin.goldRowsProb) -
-          1,
+    const goldColCount = getRandomFromProbability(
+      gameInstance.settings.freeSpin.goldColCountProb,
+    );
+    let goldCols = [];
+    for (let i = 0; i < goldColCount; i++) {
+      goldCols.push(
+        getRandomFromProbability(gameInstance.settings.freeSpin.goldColProb),
       );
     }
     // console.log("golsym", gameInstance.settings.goldWild.SymbolID);
 
-    if (goldRowCount > 0) {
-      //substituting gold wilds in random rows
+    if (goldColCount > 0) {
+      // substituting gold wilds in random columns
       const newMat: number[][] = [];
-      gameInstance.settings.resultSymbolMatrix.forEach((row, rowIndex) => {
-        let newRow = [];
-        row.forEach((symbol, colIndex) => {
-          if (goldRows.includes(colIndex)) {
-            newRow.push(gameInstance.settings.goldWild.SymbolID);
+      gameInstance.settings.resultSymbolMatrix.forEach((col, colIndex) => {
+        let newCol = [];
+        col.forEach((symbol, rowIndex) => {
+          if (goldCols.includes(rowIndex)) {
+            newCol.push(gameInstance.settings.goldWild.SymbolID);
           } else {
-            newRow.push(symbol);
+            newCol.push(symbol);
           }
         });
-        newMat.push(newRow);
+        newMat.push(newCol);
       });
       gameInstance.settings.resultSymbolMatrix = newMat;
       // console.log("mat", newMat);
     }
 
-    // console.log("gold rows:", goldRows, goldRowCount);
-    gameInstance.settings.goldWild.rows = goldRows;
+    // console.log("gold cols:", goldCols, goldColCount);
+    gameInstance.settings.goldWild.cols = goldCols;
   } catch (e: any) {
     console.log("error in handleFreeSpin", e);
   }
@@ -602,7 +599,7 @@ export function makeResultJson(gameInstance: SLGOW) {
         symbolsToEmit: settings._winData.winningSymbols,
         isFreeSpin: settings.freeSpin.isTriggered,
         count: settings.freeSpin.freeSpinCount,
-        goldWildRows: settings.goldWild.rows,
+        goldWildCol: settings.goldWild.cols,
         featureAll: settings.featureAll,
       },
       PlayerData: {
