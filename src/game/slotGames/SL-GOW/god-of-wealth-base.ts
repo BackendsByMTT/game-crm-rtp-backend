@@ -9,9 +9,7 @@ import { RandomResultGenerator } from "../RandomResultGenerator";
 import { sessionManager } from "../../../dashboard/session/sessionManager";
 import { SLGOWSETTINGS } from "./types";
 import { precisionRound } from "../../../utils/utils";
-/**
- * Represents the Blood Eternal Slot  Game Class for handling slot machine operations.
- */
+
 export class SLGOW {
   public settings: SLGOWSETTINGS;
   playerData = {

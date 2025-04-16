@@ -21,6 +21,7 @@ export const gameData = [
     gamble: {
       isEnabled: false,
     },
+    featureAllMult: [5000, 2500, 1000, 500, 400, 250, 150, 100], //8 symbols
     freeSpin: {
       isEnabled: true,
       goldRowCountProb: [1, 1, 1], // 0 row, 1 row , 2 rows
@@ -31,11 +32,11 @@ export const gameData = [
         Name: "Coin",
         Id: 0,
         reelInstance: {
-          "0": 10,
-          "1": 10,
-          "2": 10,
-          "3": 10,
-          "4": 10,
+          "0": 30,
+          "1": 30,
+          "2": 30,
+          "3": 30,
+          "4": 30,
         },
         useWildSub: true,
         multiplier: [
@@ -181,11 +182,11 @@ export const gameData = [
         Name: "GoldWild",
         Id: 9,
         reelInstance: {
-          "0": 2,
-          "1": 2,
-          "2": 2,
-          "3": 2,
-          "4": 2,
+          "0": 30,
+          "1": 30,
+          "2": 30,
+          "3": 30,
+          "4": 30,
         },
         description:
           "Replace all symbol except Scatter.\n If there are 2 or more GoldWild symbols in a game, each GoldWild symbol will unfold and become a roll of 3 GoldWild.",

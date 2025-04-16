@@ -20,6 +20,8 @@ export interface SLGOWSETTINGS {
   bets: number[];
   reels: any[][];
   Symbols: Symbol[];
+  featureAll: boolean;
+  featureAllMult: number[];
   freeSpin: {
     SymbolName: string; //scatter
     SymbolID: string;
@@ -33,6 +35,10 @@ export interface SLGOWSETTINGS {
   };
   gamble: {
     isEnabled: boolean;
+  };
+  coin: {
+    SymbolName: string;
+    SymbolID: number;
   };
   blueWild: {
     SymbolName: string;
@@ -49,4 +55,5 @@ export enum specialIcons {
   blueWild = "BlueWild",
   goldWild = "GoldWild",
   freeSpin = "Scatter",
+  coin = "Coin",
 }
