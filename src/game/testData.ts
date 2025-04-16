@@ -21,7 +21,7 @@ export const gameData = [
     gamble: {
       isEnabled: false,
     },
-    featureAllMult: [5000, 2500, 1000, 500, 400, 250, 150, 100], //8 symbols
+    featureAllMult: [5000, 2500, 1000, 500, 400, 250, 150, 100, 666], //8 + 1 (wild) symbols
     freeSpin: {
       isEnabled: true,
       goldRowCountProb: [1, 1, 1], // 0 row, 1 row , 2 rows

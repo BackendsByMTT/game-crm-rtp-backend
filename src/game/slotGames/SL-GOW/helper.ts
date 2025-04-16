@@ -143,15 +143,19 @@ function checkForfeatureAll(inst: SLGOW): { found: boolean; sym: number } {
           if (foundSymbol == -1) {
             foundSymbol = symbol;
           } else if (foundSymbol != symbol) {
-            console.log("fetall", false);
+            // console.log("fetall", false);
             return { found: false, sym: foundSymbol };
           }
         }
       }
     }
 
-    console.log("fetall", true);
-    return { found: true, sym: foundSymbol };
+    // console.log("fetall", true);
+    return {
+      found: true,
+      sym:
+        foundSymbol === -1 ? settings.featureAllMult.length - 1 : foundSymbol,
+    };
   } catch (e: any) {
     console.log("error in checkForfeatureAll", e);
     return { found: false, sym: -1 }; // Important: Return a default value in case of error

@@ -22,9 +22,9 @@ export class RandomResultGenerator {
     // matrix.pop();
     // matrix.pop();
     // matrix.pop();
-    // matrix.push(["7", "7", "7", "7", "7"]);
-    // matrix.push(["7", "7", "7", "7", "7"]);
-    // matrix.push(["7", "7", "7", "7", "7"]);
+    // matrix.push(["8", "9", "9", "9", "9"]);
+    // matrix.push(["8", "9", "9", "9", "9"]);
+    // matrix.push(["8", "9", "9", "9", "9"]);
     matrix.forEach((row) => console.log(row.join(" ")));
     current.settings.resultReelIndex = matrix;
     current.settings.resultSymbolMatrix = matrix;
