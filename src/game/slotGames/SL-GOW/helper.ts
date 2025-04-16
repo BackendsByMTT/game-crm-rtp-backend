@@ -314,17 +314,17 @@ export function checkForWin(gameInstance: SLGOW) {
       settings.freeSpin.freeSpinCount -= 1;
     }
 
-    if (settings.freeSpin.freeSpinCount <= 0) {
-      const { found, count } = checkForFreeSpin(gameInstance);
+    const { found: foundFree, count } = checkForFreeSpin(gameInstance);
 
-      // console.log("checkfreespin :", found, count);
+    // if (settings.freeSpin.freeSpinCount <= 0) {
+    //   // console.log("checkfreespin :", found, count);
 
-      if (found) {
-        settings.freeSpin.isTriggered = true;
-        settings.freeSpin.isFreeSpin = true;
-        settings.freeSpin.freeSpinCount += count;
-      }
+    if (foundFree) {
+      settings.freeSpin.isTriggered = true;
+      settings.freeSpin.isFreeSpin = true;
+      settings.freeSpin.freeSpinCount += count;
     }
+    // }
     gameInstance.playerData.haveWon += gameInstance.playerData.currentWining;
     makeResultJson(gameInstance);
     settings._winData.winningLines = [];
