@@ -36,8 +36,10 @@ export function initializeGameSettings(gameData: any, gameInstance: SLGOW) {
       isEnabled: gameData.gameSettings.freeSpin.isEnabled,
       isFreeSpin: false,
       isTriggered: false,
-      goldColProb: gameData.gameSettings.freeSpin.goldRowsProb,
-      goldColCountProb: gameData.gameSettings.freeSpin.goldRowCountProb,
+      goldColProb: gameData.gameSettings.freeSpin.goldColProb || [1, 1, 1],
+      goldColCountProb: gameData.gameSettings.freeSpin.goldColCountProb || [
+        1, 1, 1,
+      ],
       countIncrement: gameData.gameSettings.Symbols.find(
         (s: any) => s.Name === specialIcons.freeSpin,
       )
@@ -174,7 +176,7 @@ export function checkForWin(gameInstance: SLGOW) {
     const winningLines = [];
     let totalPayout = 0;
 
-    if (settings.freeSpin.isFreeSpin) {
+    if (settings.freeSpin.freeSpinCount > 0) {
       handleFreeSpin(gameInstance);
     } else {
       settings.freeSpin.isFreeSpin = false;
@@ -299,6 +301,8 @@ export function checkForWin(gameInstance: SLGOW) {
       }
     });
     const { found, sym } = checkForfeatureAll(gameInstance);
+    console.log("feature all found", found, sym);
+
     if (found) {
       settings.featureAll = true;
       const pay = calculateFeaturePayout(
@@ -315,6 +319,7 @@ export function checkForWin(gameInstance: SLGOW) {
     }
 
     const { found: foundFree, count } = checkForFreeSpin(gameInstance);
+    console.log("freespin found", foundFree, count);
 
     // if (settings.freeSpin.freeSpinCount <= 0) {
     //   // console.log("checkfreespin :", found, count);
@@ -489,8 +494,6 @@ export function sendInitData(gameInstance: SLGOW) {
 }
 
 function getRandomFromProbability(probArray: number[]): number {
-  console.log("probArr:", probArray.length, probArray);
-
   try {
     const totalProb = probArray.reduce((sum, p) => sum + p, 0);
     const randValue = Math.random() * totalProb;
@@ -512,14 +515,12 @@ function getRandomFromProbability(probArray: number[]): number {
 
 function handleFreeSpin(gameInstance: SLGOW) {
   try {
-    const goldColCount = getRandomFromProbability(
-      gameInstance.settings.freeSpin.goldColCountProb,
-    );
-    let goldCols = [];
+    const { freeSpin } = gameInstance.settings;
+
+    const goldColCount = getRandomFromProbability(freeSpin.goldColCountProb);
+    let goldCols = new Set<number>();
     for (let i = 0; i < goldColCount; i++) {
-      goldCols.push(
-        getRandomFromProbability(gameInstance.settings.freeSpin.goldColProb),
-      );
+      goldCols.add(getRandomFromProbability(freeSpin.goldColProb) - 1);
     }
     // console.log("golsym", gameInstance.settings.goldWild.SymbolID);
 
@@ -529,7 +530,7 @@ function handleFreeSpin(gameInstance: SLGOW) {
       gameInstance.settings.resultSymbolMatrix.forEach((col, colIndex) => {
         let newCol = [];
         col.forEach((symbol, rowIndex) => {
-          if (goldCols.includes(rowIndex)) {
+          if (goldCols.has(rowIndex)) {
             newCol.push(gameInstance.settings.goldWild.SymbolID);
           } else {
             newCol.push(symbol);
@@ -542,7 +543,7 @@ function handleFreeSpin(gameInstance: SLGOW) {
     }
 
     // console.log("gold cols:", goldCols, goldColCount);
-    gameInstance.settings.goldWild.cols = goldCols;
+    gameInstance.settings.goldWild.cols = Array.from(goldCols);
   } catch (e: any) {
     console.log("error in handleFreeSpin", e);
   }
@@ -610,7 +611,7 @@ export function makeResultJson(gameInstance: SLGOW) {
         haveWon: playerData.haveWon,
       },
     };
-    console.info("ResultData", JSON.stringify(sendData));
+    console.info("ResultData", JSON.stringify(sendData, null, 1));
 
     gameInstance.sendMessage("ResultData", sendData);
   } catch (error) {

@@ -24,19 +24,19 @@ export const gameData = [
     featureAllMult: [5000, 2500, 1000, 500, 400, 250, 150, 100, 666], //8 + 1 (wild) symbols
     freeSpin: {
       isEnabled: true,
-      goldColCountProb: [1, 1, 1], // 0 row, 1 row , 2 rows
-      goldColProb: [1, 1, 1, 1, 1], // 0th row gold, 1st row gold, 2nd row gold, 3rd row gold, 4th row gold
+      goldColCountProb: [1, 19, 19], // 0 row, 1 row , 2 rows
+      goldColProb: [1, 1, 1, 1, 1],
     },
     Symbols: [
       {
         Name: "Coin",
         Id: 0,
         reelInstance: {
-          "0": 30,
-          "1": 30,
-          "2": 30,
-          "3": 30,
-          "4": 30,
+          "0": 3,
+          "1": 3,
+          "2": 3,
+          "3": 3,
+          "4": 3,
         },
         useWildSub: true,
         multiplier: [
@@ -182,11 +182,11 @@ export const gameData = [
         Name: "GoldWild",
         Id: 9,
         reelInstance: {
-          "0": 30,
-          "1": 30,
-          "2": 30,
-          "3": 30,
-          "4": 30,
+          "0": 3,
+          "1": 3,
+          "2": 3,
+          "3": 3,
+          "4": 3,
         },
         description:
           "Replace all symbol except Scatter.\n If there are 2 or more GoldWild symbols in a game, each GoldWild symbol will unfold and become a roll of 3 GoldWild.",
@@ -197,11 +197,11 @@ export const gameData = [
         Name: "Scatter",
         Id: 10,
         reelInstance: {
-          "0": 9,
-          "1": 9,
-          "2": 9,
-          "3": 9,
-          "4": 9,
+          "0": 32,
+          "1": 32,
+          "2": 32,
+          "3": 32,
+          "4": 32,
         },
         description:
           "Scatter may appear at any position.\n God of Fortune will appear randomly and give GoldWild on 1st to 3rd reel by chance.\n God of Fortune will appear randomly and give GoldWild. It will unfold and become a roll of 3 WILD.\n 3 or more Scatter in a game during the free game, the times of free spin will be added according to the rule of Free Game.",
