@@ -60,7 +60,7 @@ export const setBackground = async (req: Request, res: Response) => {
     //NOTE: emit socket msg - "reactNat","isBack:true | false"
     const _req = req as AuthRequest;
     const { username } = _req.user;
-    const player = sessionManager.getPlayerPlatform(username);
+    const player = sessionManager.getPlaygroundUser(username);
 
     const background: boolean = req.body.isBack;
     player.currentGameData.sendMessage("appBackground", background, true)
