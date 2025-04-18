@@ -1,399 +1,217 @@
 export const gameData = [
-    {
-       "id":"SL-LS",
-       "matrix":{
-          "x":3,
-          "y":3
-       },
-       "linesApiData":[
-          [
-             0,
-             0,
-             0
-          ],
-          [
-             1,
-             1,
-             1
-          ],
-          [
-             2,
-             2,
-             2
-          ],
-          [
-             0,
-             1,
-             2
-          ],
-          [
-             2,
-             1,
-             0
-          ],
-          [
-             0,
-             1,
-             0
-          ],
-          [
-             2,
-             1,
-             2
-          ],
-          [
-             1,
-             0,
-             1
-          ],
-          [
-             1,
-             2,
-             1
-          ]
-       ],
-       "linesCount":[
-          9
-       ],
-       "jackpotMultiplier":100,
-       "jackpotCombination":[
-          "0",
-          "1",
-          "2"
-       ],
-       "paytable":[
-          {
-             "combination":[
-                "6",
-                "6",
-                "6"
-             ],
-             "payout":20
-          },
-          {
-             "combination":[
-                "0",
-                "0",
-                "0"
-             ],
-             "payout":16
-          },
-          {
-             "combination":[
-                "1",
-                "1",
-                "1"
-             ],
-             "payout":14
-          },
-          {
-             "combination":[
-                "2",
-                "2",
-                "2"
-             ],
-             "payout":12
-          },
-          {
-             "combination":[
-                "3",
-                "3",
-                "3"
-             ],
-             "payout":8
-          },
-          {
-             "combination":[
-                "4",
-                "4",
-                "4"
-             ],
-             "payout":6
-          },
-          {
-             "combination":[
-                "5",
-                "5",
-                "5"
-             ],
-             "payout":4
-          },
-          {
-             "combination":[
-                "0",
-                "1",
-                "2"
-             ],
-             "payout":5
-          },
-          {
-             "combination":[
-                "0",
-                "2",
-                "1"
-             ],
-             "payout":5
-          },
-          {
-             "combination":[
-                "1",
-                "0",
-                "2"
-             ],
-             "payout":5
-          },
-          {
-             "combination":[
-                "1",
-                "2",
-                "0"
-             ],
-             "payout":5
-          },
-          {
-             "combination":[
-                "2",
-                "0",
-                "1"
-             ],
-             "payout":5
-          },
-          {
-             "combination":[
-                "2",
-                "1",
-                "0"
-             ],
-             "payout":5
-          },
-          {
-             "combination":[
-                "0",
-                "3"
-             ],
-             "payout":3
-          },
-          {
-             "combination":[
-                "3",
-                "0"
-             ],
-             "payout":3
-          },
-          {
-             "combination":[
-                "1",
-                "4"
-             ],
-             "payout":3
-          },
-          {
-             "combination":[
-                "4",
-                "1"
-             ],
-             "payout":3
-          },
-          {
-             "combination":[
-                "2",
-                "5"
-             ],
-             "payout":3
-          },
-          {
-             "combination":[
-                "5",
-                "2"
-             ],
-             "payout":3
-          },
-          {
-             "combination":[
-                "3",
-                "4",
-                "5"
-             ],
-             "payout":1.5
-          },
-          {
-             "combination":[
-                "3",
-                "5",
-                "4"
-             ],
-             "payout":1.5
-          },
-          {
-             "combination":[
-                "4",
-                "3",
-                "5"
-             ],
-             "payout":1.5
-          },
-          {
-             "combination":[
-                "4",
-                "5",
-                "3"
-             ],
-             "payout":1.5
-          },
-          {
-             "combination":[
-                "5",
-                "3",
-                "4"
-             ],
-             "payout":1.5
-          },
-          {
-             "combination":[
-                "5",
-                "4",
-                "3"
-             ],
-             "payout":1.5
-          }
-       ],
-       "bets":[
-          0.01,
-          0.02,
-          0.04,
-          0.05,
-          0.07,
-          0.1,
-          0.2,
-          0.4,
-          0.5,
-          0.7,
-          1,
-          1.5,
-          2,
-          3
-       ],
-       "Symbols":[
-          {
-             "Name":"0",
-             "Id":0,
-             "canmatch":[
-                "0",
-                "1",
-                "2",
-                "3"
-             ],
-             "reelInstance":{
-                "0":8,
-                "1":8,
-                "2":8
-             }
-          },
-          {
-             "Name":"1",
-             "Id":1,
-             "canmatch":[
-                "0",
-                "1",
-                "2",
-                "4"
-             ],
-             "description":"",
-             "reelInstance":{
-                "0":8,
-                "1":8,
-                "2":8
-             }
-          },
-          {
-             "Name":"2",
-             "Id":2,
-             "canmatch":[
-                "0",
-                "1",
-                "2",
-                "5"
-             ],
-             "reelInstance":{
-                "0":8,
-                "1":8,
-                "2":8
-             }
-          },
-          {
-             "Name":"3",
-             "Id":3,
-             "canmatch":[
-                "3",
-                "4",
-                "5",
-                "0"
-             ],
-             "description":"",
-             "reelInstance":{
-                "0":10,
-                "1":10,
-                "2":10
-             }
-          },
-          {
-             "Name":"4",
-             "Id":4,
-             "canmatch":[
-                "3",
-                "4",
-                "5",
-                "1"
-             ],
-             "description":"",
-             "reelInstance":{
-                "0":10,
-                "1":10,
-                "2":10
-             }
-          },
-          {
-             "Name":"5",
-             "Id":5,
-             "canmatch":[
-                "3",
-                "4",
-                "5",
-                "2"
-             ],
-             "description":"",
-             "reelInstance":{
-                "0":10,
-                "1":10,
-                "2":10
-             }
-          },
-          {
-             "Name":"6",
-             "Id":6,
-             "canmatch":[
-                
-             ],
-             "description":"Substitutes for all symbols, For more winnings.",
-             "reelInstance":{
-                "0":8,
-                "1":8,
-                "2":8
-             }
-          },
-          {
-             "Name":"7",
-             "Id":7,
-             "canmatch":[
-                
-             ],
-             "reelInstance":{
-                "0":13,
-                "1":13,
-                "2":13
-             }
-          }
-       ]
-    }
- ]
- 
+  {
+    id: "SL-GOW",
+    matrix: {
+      x: 5,
+      y: 3,
+    },
+    linesApiData: [
+      [0, 0, 0, 0, 0],
+      [1, 1, 1, 1, 1],
+      [2, 2, 2, 2, 2],
+      [0, 1, 2, 1, 0],
+      [2, 1, 0, 1, 2],
+      [0, 0, 1, 0, 0],
+      [2, 2, 1, 2, 2],
+      [1, 0, 0, 0, 1],
+      [1, 2, 2, 2, 1],
+    ],
+    linesCount: [1, 3, 5, 9],
+    bets: [0.01, 0.02, 0.04, 0.05, 0.07, 0.1, 0.2, 0.4, 0.5, 0.7, 1, 1.5, 2, 3],
+    gamble: {
+      isEnabled: false,
+    },
+    featureAllMult: [5000, 2500, 1000, 500, 400, 250, 150, 100, 666], //8 + 1 (wild) symbols
+    freeSpin: {
+      isEnabled: true,
+      goldColCountProb: [1, 19, 19], // 0 row, 1 row , 2 rows
+      goldColProb: [1, 1, 1, 1, 1],
+    },
+    Symbols: [
+      {
+        Name: "Coin",
+        Id: 0,
+        reelInstance: {
+          "0": 3,
+          "1": 3,
+          "2": 3,
+          "3": 3,
+          "4": 3,
+        },
+        useWildSub: true,
+        multiplier: [
+          [20, 0],
+          [5, 0],
+          [2, 0],
+        ],
+      },
+      {
+        Name: "Firework",
+        Id: 1,
+        reelInstance: {
+          "0": 10,
+          "1": 10,
+          "2": 10,
+          "3": 10,
+          "4": 10,
+        },
+        useWildSub: true,
+        multiplier: [
+          [40, 0],
+          [10, 0],
+          [3, 0],
+        ],
+      },
+      {
+        Name: "Jade",
+        Id: 2,
+        reelInstance: {
+          "0": 10,
+          "1": 10,
+          "2": 10,
+          "3": 10,
+          "4": 10,
+        },
+        useWildSub: true,
+        multiplier: [
+          [60, 0],
+          [15, 0],
+          [5, 0],
+        ],
+      },
+      {
+        Name: "Drum",
+        Id: 3,
+        reelInstance: {
+          "0": 10,
+          "1": 10,
+          "2": 10,
+          "3": 10,
+          "4": 10,
+        },
+        useWildSub: true,
+        multiplier: [
+          [100, 0],
+          [20, 0],
+          [7, 0],
+        ],
+      },
+      {
+        Name: "Girl",
+        Id: 4,
+        reelInstance: {
+          "0": 4,
+          "1": 4,
+          "2": 4,
+          "3": 4,
+          "4": 4,
+        },
+        useWildSub: true,
+        multiplier: [
+          [160, 0],
+          [30, 0],
+          [10, 0],
+        ],
+      },
+      {
+        Name: "Boy",
+        Id: 5,
+        reelInstance: {
+          "0": 4,
+          "1": 4,
+          "2": 4,
+          "3": 4,
+          "4": 4,
+        },
+        useWildSub: true,
+        multiplier: [
+          [200, 0],
+          [40, 0],
+          [15, 0],
+        ],
+      },
+      {
+        Name: "King",
+        Id: 6,
+        reelInstance: {
+          "0": 4,
+          "1": 4,
+          "2": 4,
+          "3": 4,
+          "4": 4,
+        },
+        useWildSub: true,
+        multiplier: [
+          [400, 0],
+          [80, 0],
+          [20, 0],
+        ],
+      },
+      {
+        Name: "Emperor",
+        Id: 7,
+        reelInstance: {
+          "0": 4,
+          "1": 4,
+          "2": 4,
+          "3": 4,
+          "4": 4,
+        },
+        useWildSub: true,
+        multiplier: [
+          [1000, 0],
+          [200, 0],
+          [50, 0],
+        ],
+      },
+      {
+        Name: "BlueWild",
+        Id: 8,
+        reelInstance: {
+          "0": 3,
+          "1": 3,
+          "2": 3,
+          "3": 3,
+          "4": 3,
+        },
+        description: "Replace all except Scatter & GoldWild",
+        useWildSub: false,
+        multiplier: [],
+      },
+      {
+        Name: "GoldWild",
+        Id: 9,
+        reelInstance: {
+          "0": 3,
+          "1": 3,
+          "2": 3,
+          "3": 3,
+          "4": 3,
+        },
+        description:
+          "Replace all symbol except Scatter.\n If there are 2 or more GoldWild symbols in a game, each GoldWild symbol will unfold and become a roll of 3 GoldWild.",
+        useWildSub: false,
+        multiplier: [],
+      },
+      {
+        Name: "Scatter",
+        Id: 10,
+        reelInstance: {
+          "0": 32,
+          "1": 32,
+          "2": 32,
+          "3": 32,
+          "4": 32,
+        },
+        description:
+          "Scatter may appear at any position.\n God of Fortune will appear randomly and give GoldWild on 1st to 3rd reel by chance.\n God of Fortune will appear randomly and give GoldWild. It will unfold and become a roll of 3 WILD.\n 3 or more Scatter in a game during the free game, the times of free spin will be added according to the rule of Free Game.",
+        useWildSub: false,
+        multiplier: [
+          [0, 10],
+          [0, 5],
+          [0, 3],
+        ],
+      },
+    ],
+  },
+];

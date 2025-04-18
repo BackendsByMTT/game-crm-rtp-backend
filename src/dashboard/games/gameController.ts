@@ -186,7 +186,7 @@ export class GameController {
         console.log(`Player ${username} already has an active game: ${playerSession.currentGameData.gameId}`);
         throw createHttpError(403, "You already have an active game session. Please finish your current game first");
       }
-
+      
 
       const platform = await Platform.aggregate([
         { $unwind: "$games" },
