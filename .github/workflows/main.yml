@@ -3,7 +3,7 @@ name: Build and Deploy
 on:
   push:
     branches:
-      - "dev-g"
+      - "dev-redis"
   workflow_dispatch:
 
 permissions:
@@ -26,14 +26,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.G_TOKEN }}
         run: |
-          git checkout dev-g
+          git checkout dev-redis
           git checkout -b dev-build-g
         # git config user.name "TrippyRahul"
         # git config user.email "rahulrawat.trippybug@gmail.com"
         # rm -rf ./src ./app.js
         # git add .
         # git commit -m "remove old artifacts" || echo "No changes to commit"
-        # git checkout dev-g
+        # git checkout dev-redis
          
       - name: Install Dependencies
         run: npm install
