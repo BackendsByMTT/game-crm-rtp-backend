@@ -301,7 +301,8 @@ export function checkForWin(gameInstance: SLGOW) {
       }
     });
     const { found, sym } = checkForfeatureAll(gameInstance);
-    console.log("feature all found", found, sym);
+    //INFO:
+    // console.log("feature all found", found, sym);
 
     if (found) {
       settings.featureAll = true;
@@ -319,7 +320,8 @@ export function checkForWin(gameInstance: SLGOW) {
     }
 
     const { found: foundFree, count } = checkForFreeSpin(gameInstance);
-    console.log("freespin found", foundFree, count);
+    //INFO:
+    // console.log("freespin found", foundFree, count);
 
     // if (settings.freeSpin.freeSpinCount <= 0) {
     //   // console.log("checkfreespin :", found, count);
@@ -611,7 +613,7 @@ export function makeResultJson(gameInstance: SLGOW) {
         haveWon: playerData.haveWon,
       },
     };
-    console.info("ResultData", JSON.stringify(sendData, null, 1));
+    // console.info("ResultData", JSON.stringify(sendData, null, 1));
 
     gameInstance.sendMessage("ResultData", sendData);
   } catch (error) {
