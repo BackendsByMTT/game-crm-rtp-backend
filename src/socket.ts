@@ -61,126 +61,130 @@ const handlePlayerConnection = async (socket: Socket, decoded: DecodedToken, use
         const platformId = socket.handshake.auth.platformId;
         const origin = socket.handshake.auth.origin;
         const gameId = socket.handshake.auth.gameId;
-        const { credits, status, managerName } = await getPlayerDetails(username);
+        console.log(`Handling player connection for user ${username}`);
+        console.log(`Platform ID: ${platformId}, Origin: ${origin}, Game ID: ${gameId}`);
 
-        let existingPlayer = sessionManager.getPlayerPlatform(username);
+        const { credits, status, managerName } = await getPlayerDetails(username);
+        console.log(`Player details - Credits: ${credits}, Status: ${status}, Manager Name: ${managerName}`);
+
+        let existingPlayer = await sessionManager.getPlaygroundUser(username);
+        console.log(`Existing player: ${existingPlayer ? 'Yes' : 'No'}`);
 
         if (existingPlayer) {
             // Platform connection handling
             if (origin) {
-                if (existingPlayer.platformData.platformId !== platformId) {
-                    console.log(`Duplicate platform detected for ${username}`);
-                    socket.emit("alert", "NewTab");
-                    socket.disconnect(true);
-                    return;
-                }
+                try {
+                    console.log(`Handling platform connection for user ${username}`);
+                    if (existingPlayer.platformData.platformId !== platformId) {
+                        console.log(`Duplicate platform detected for ${username}`);
+                        socket.emit("alert", "NewTab");
+                        socket.disconnect(true);
+                        return;
+                    }
 
-                if (existingPlayer.platformData.socket && existingPlayer.platformData.socket.connected) {
-                    console.log(`Platform already connected for ${username}`);
-                    socket.emit("alert", "Platform already connected.");
-                    socket.disconnect(true);
-                    return;
-                }
+                    if (existingPlayer.platformData.socket && existingPlayer.platformData.socket.connected) {
+                        console.log(`Platform already connected for ${username}`);
+                        socket.emit("alert", "Platform already connected.");
+                        socket.disconnect(true);
+                        return;
+                    }
 
-                console.log(`Reinitializing platform connection for ${username}`);
-                existingPlayer.initializePlatformSocket(socket);
-                existingPlayer.sendAlert(`Platform reconnected for ${username}`, false);
-                return;
+                    console.log(`Reinitializing platform connection for ${username}`);
+                    existingPlayer.initializePlatformSocket(socket);
+                    existingPlayer.sendAlert(`Platform reconnected for ${username}`, false);
+                    return;
+                } catch (error) {
+                    console.error(`Error handling platform connection for user ${username}:`, error);
+                    socket.emit(messageType.ERROR, `Error handling platform connection for user ${username}: ${error.message}`);
+                    socket.disconnect(true);
+                }
             }
 
             // Game connection handling
             if (gameId || !gameId) {
-                if (!existingPlayer.platformData.socket || !existingPlayer.platformData.socket.connected) {
-                    console.log("Platform connection required before joining a game.");
-                    socket.emit(messageType.ERROR, "Platform connection required before joining a game.");
-                    socket.disconnect(true);
-                    return;
-                }
+                try {
+                    console.log(`Handling game connection for user ${username}`);
+                    if (!existingPlayer.platformData.socket || !existingPlayer.platformData.socket.connected) {
+                        console.log("Platform connection required before joining a game.");
+                        socket.emit(messageType.ERROR, "Platform connection required before joining a game.");
+                        socket.disconnect(true);
+                        return;
+                    }
 
-                console.log("Game connection attempt detected, ensuring platform stability");
-                await existingPlayer.updateGameSocket(socket);
-                existingPlayer.sendAlert(`Game initialized for ${username} in game ${gameId}`);
-                return;
+                    console.log("Game connection attempt detected, ensuring platform stability");
+                    await existingPlayer.updateGameSocket(socket);
+                    existingPlayer.sendAlert(`Game initialized for ${username} in game ${gameId}`);
+                    return;
+                } catch (error) {
+                    console.error(`Error handling game connection for user ${username}:`, error);
+                    socket.emit(messageType.ERROR, `Error handling game connection for user ${username}: ${error.message}`);
+                    socket.disconnect(true);
+                }
             }
         }
 
         // New platform connection
         if (origin) {
-            const newUser = new Player(username, decoded.role, status, credits, userAgent, socket, managerName);
-            newUser.platformData.platformId = platformId;
-            newUser.sendAlert(`Player initialized for ${username} on platform ${origin}`, false);
-            return;
+            try {
+                console.log(`New platform connection for user ${username}`);
+                const newUser = new Player(username, decoded.role, status, credits, userAgent, socket, managerName);
+                newUser.platformData.platformId = platformId;
+                newUser.sendAlert(`Player initialized for ${username} on platform ${origin}`, false);
+                return;
+            } catch (error) {
+                console.error(`Error handling new platform connection for user ${username}:`, error);
+                socket.emit(messageType.ERROR, `Error handling new platform connection for user ${username}: ${error.message}`);
+                socket.disconnect(true);
+            }
         }
 
         // Game connection without existing platform connection
         if (process.env.NODE_ENV === "testing") {
-            console.log("Testing environment detected. Creating platform socket for the player.");
+            try {
+                console.log("Testing environment detected. Creating platform socket for the player.");
 
-            const mockPlatformSocket = {
-                handshake: { auth: { platformId: `test-platform-${username}` } },
-                connected: true,
-                emit: socket.emit.bind(socket),
-                disconnect: socket.disconnect.bind(socket),
-                on: socket.on.bind(socket),
-            } as unknown as Socket;
+                const mockPlatformSocket = {
+                    handshake: { auth: { platformId: `test-platform-${username}` } },
+                    connected: true,
+                    emit: socket.emit.bind(socket),
+                    disconnect: socket.disconnect.bind(socket),
+                    on: socket.on.bind(socket),
+                } as unknown as Socket;
 
-            const testPlayer = new Player(
-                username,
-                decoded.role,
-                status,
-                credits,
-                userAgent,
-                mockPlatformSocket,
-                managerName
-            );
+                const testPlayer = new Player(
+                    username,
+                    decoded.role,
+                    status,
+                    credits,
+                    userAgent,
+                    mockPlatformSocket,
+                    managerName
+                );
 
-            testPlayer.platformData.platformId = `test-platform-${username}`;
-            await testPlayer.updateGameSocket(socket);
-            return;
+                testPlayer.platformData.platformId = `test-platform-${username}`;
+                await testPlayer.updateGameSocket(socket);
+                return;
+            } catch (error) {
+                console.error(`Error handling game connection in testing environment for user ${username}:`, error);
+                socket.emit(messageType.ERROR, `Error handling game connection in testing environment for user ${username}: ${error.message}`);
+                socket.disconnect(true);
+            }
         }
 
         // Invalid connection attempt
+        console.log(`Invalid connection attempt for user ${username}`);
         socket.emit(messageType.ERROR, "Invalid connection attempt.");
-        // socket.disconnect(true);
+        socket.disconnect(true);
     } catch (error) {
         console.error(`Error in handlePlayerConnection for user ${decoded?.username || 'unknown'}:`, error);
-        socket.emit(messageType.ERROR, `Error in handlePlayerConnection for user ${decoded?.username || 'unknown'}:`, error);
+        socket.emit(messageType.ERROR, `Error in handlePlayerConnection for user ${decoded?.username || 'unknown'}: ${error.message}`);
         socket.disconnect(true);
     }
-
-};
+};;
 
 
 const handleManagerConnection = async (socket: Socket, decoded: DecodedToken, userAgent: string) => {
-    const username = decoded.username;
-    const role = decoded.role
-    const { credits } = await getManagerDetails(username);
-    console.log("MANAGER CONNECTION")
 
-    let existingManager = sessionManager.getActiveManagerByUsername(username);
-
-    if (existingManager) {
-        console.log(`Reinitializing manager ${username}`);
-
-        if (existingManager.socketData.reconnectionTimeout) {
-            clearTimeout(existingManager.socketData.reconnectionTimeout);
-        }
-
-        existingManager.initializeManager(socket);
-        socket.emit(messageType.ALERT, `Manager ${username} has been reconnected.`);
-    } else {
-        const newManager = new Manager(username, credits, role, userAgent, socket);
-        sessionManager.addManager(username, newManager)
-        socket.emit(messageType.ALERT, `Manager ${username} has been connected.`);
-    }
-
-    // Send all active players to the manager upon connection
-    // const activeUsersData = Array.from(sessionManager.getPlatformSessions().values()).map(player => {
-    //     const platformSession = sessionManager.getPlayerPlatform(player.playerData.username);
-    //     return platformSession?.getSummary() || {};
-    // });
-
-    // socket.emit("activePlayers", activeUsersData);
 };
 
 

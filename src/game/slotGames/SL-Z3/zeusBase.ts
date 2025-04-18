@@ -73,7 +73,7 @@ export class SLZEUS {
     public async spinResult(): Promise<void> {
         try {
             const playerData = this.getPlayerData();
-            const platformSession = sessionManager.getPlayerPlatform(playerData.username);
+            const platformSession = await sessionManager.getPlaygroundUser(playerData.username);
 
             if (this.settings.currentBet > playerData.credits) {
                 console.log(this.settings.currentBet + playerData.credits)

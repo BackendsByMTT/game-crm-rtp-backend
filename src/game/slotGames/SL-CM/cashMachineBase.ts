@@ -68,7 +68,7 @@ export class SLCM {
     public async spinResult(): Promise<void> {
         try {
             const playerData = this.getPlayerData();
-            const platformSession = sessionManager.getPlayerPlatform(playerData.username);
+            const platformSession = await sessionManager.getPlaygroundUser(playerData.username);
 
             if (this.settings.currentBet > playerData.credits) {
                 this.sendError("Low Balance");
@@ -80,13 +80,13 @@ export class SLCM {
             this.settings.resultSymbolMatrix[0] = this.selectResultBasedOnProbability(this.settings.matrix.x);
 
             const spinId = platformSession.currentGameSession.createSpin();
-            platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
+            await platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
 
             this.checkResult();
 
 
             const winAmount = this.playerData.currentWining;
-            platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', winAmount);
+            await platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', winAmount);
         } catch (error) {
             this.sendError("Spin error");
             console.error("Failed to generate spin results:", error);

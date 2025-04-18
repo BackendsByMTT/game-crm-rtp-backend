@@ -70,12 +70,13 @@ export class SLBS {
     private prepareSpin(data: any) {
         this.settings.currentLines = data.currentLines;
         this.settings.BetPerLines = this.settings.currentGamedata.bets[data.currentBet];
-        this.settings.currentBet = this.settings.BetPerLines * this.settings.currentLines;    }
+        this.settings.currentBet = this.settings.BetPerLines * this.settings.currentLines;
+    }
 
     public async spinResult(): Promise<void> {
         try {
             const playerData = this.getPlayerData();
-            const platformSession = sessionManager.getPlayerPlatform(playerData.username);
+            const platformSession = await sessionManager.getPlaygroundUser(playerData.username);
 
             if (this.settings.currentBet > playerData.credits) {
                 console.log(this.settings.currentBet + playerData.credits)
@@ -84,24 +85,24 @@ export class SLBS {
             }
             if (!this.settings.freeSpin.useFreeSpin) {
                 await this.deductPlayerBalance(this.settings.currentBet);
-                
+
                 // Ensure the totalbet is limited to 4 decimal places
                 this.playerData.totalbet = parseFloat(
                     (this.playerData.totalbet + this.settings.currentBet).toFixed(4)
                 );
-            
+
             }
-            
+
 
             const spinId = platformSession.currentGameSession.createSpin();
-            platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
+            await platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
 
 
             await new RandomResultGenerator(this);
             checkForWin(this)
 
             const winAmount = this.playerData.currentWining;
-            platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', winAmount);
+            await platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', winAmount);
 
         } catch (error) {
             this.sendError("Spin error");

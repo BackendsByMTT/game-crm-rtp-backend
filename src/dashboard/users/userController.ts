@@ -10,14 +10,15 @@ import createHttpError from "http-errors";
 import jwt from "jsonwebtoken";
 import { config } from "../../config/config";
 import bcrypt from "bcrypt";
-import mongoose, { PipelineStage, Types } from "mongoose";
+import mongoose, { PipelineStage } from "mongoose";
 import { User, Player as PlayerModel, Player } from "./userModel";
 import UserService from "./userService";
 import Transaction from "../transactions/transactionModel";
-import { QueryParams } from "../../utils/globalTypes";
 import { IPlayer, IUser } from "./userType";
 import { sessionManager } from "../session/sessionManager";
-import { hasPermission, isAdmin, isSubordinate } from "../../utils/permissions";
+import { hasPermission, isAdmin } from "../../utils/permissions";
+import { redisClient } from "../../config/redis";
+import { Channels } from "../../utils/events";
 
 interface ActivePlayer {
   username: string;
@@ -139,6 +140,8 @@ export class UserController {
     try {
       const { username, password } = req.body;
 
+      console.log("Login request:", username, password);
+
       if (!username || !password) {
         throw createHttpError(400, "Username, password are required");
       }
@@ -151,23 +154,25 @@ export class UserController {
       }
 
       const isPasswordValid = await bcrypt.compare(password, user.password);
-
       if (!isPasswordValid) {
         throw createHttpError(401, "Invalid username or password");
       }
 
-      if (user.role === "player") {
-        await PlayerModel.updateOne(
-          { _id: user._id },
-          { $set: { lastLogin: new Date(), $inc: { loginTimes: 1 } } }
-        )
+      const redisSession = await redisClient.pubClient.hGetAll(Channels.PLAYGROUND(username));
+      if (redisSession?.sessionId && redisSession?.platformId) {
+        throw createHttpError(403, "User is already logged in on another browser or tab.");
       }
-      else {
-        await User.updateOne(
-          { _id: user._id },
-          {
-            $set: { lastLogin: new Date(), $inc: { loginTimes: 1 } }
-          });
+
+      // Update login metadata
+      const updateData = {
+        $set: { lastLogin: new Date() },
+        $inc: { loginTimes: 1 },
+      };
+
+      if (user.role === "player") {
+        await PlayerModel.updateOne({ _id: user._id }, updateData);
+      } else {
+        await User.updateOne({ _id: user._id }, updateData);
       }
 
       const token = jwt.sign(
@@ -176,22 +181,6 @@ export class UserController {
         { expiresIn: "7d" }
       );
 
-      // res.cookie("userToken", token, {
-      //   maxAge: 1000 * 60 * 60 * 24 * 7,
-      //   httpOnly: true,
-      //   sameSite: "none",
-      // });
-
-
-      const socketUser = sessionManager.getPlayerPlatform(username);
-
-      if (socketUser?.platformData.socket?.connected || socketUser?.gameData.socket) {
-        throw createHttpError(403, "Already logged in on another browser or tab.");
-      }
-
-      if (socketUser?.gameData.socket) {
-        throw createHttpError(403, "You Are Already Playing on another browser or tab.");
-      }
 
       res.status(200).json({
         message: "Login successful",
@@ -213,11 +202,23 @@ export class UserController {
         throw createHttpError(400, "Username is required");
       }
 
-      // Clear the user token cookie
-      res.clearCookie("userToken", {
-        httpOnly: true,
-        sameSite: "none",
-      });
+      const platformSession = sessionManager.getPlaygroundUser(username);
+      if (platformSession) {
+        await platformSession.cleanupPlatformSocket()
+      } else {
+        const redisSession = await redisClient.pubClient.hGetAll(Channels.PLAYGROUND(username));
+        if (redisSession?.sessionId) {
+          await sessionManager.endSession(username);
+        } else {
+          console.warn(`⚠️ No session found in Redis or memory for ${username}`);
+        }
+      }
+
+      res.clearCookie("token");
+      res.clearCookie("AWSALBTG");
+      res.clearCookie("AWSALBTGCORS");
+      res.clearCookie("index");
+
 
       res.status(200).json({
         message: "Logout successful",
@@ -529,10 +530,7 @@ export class UserController {
 
   async getAllPlayers(req: Request, res: Response, next: NextFunction) {
     try {
-      const activePlayers = new Set();
-      sessionManager.getPlatformSessions().forEach((value, key) => {
-        activePlayers.add({ username: key, currentGame: value.currentGameData.gameId });
-      });
+
 
       const _req = req as AuthRequest;
       const { username: currentUsername, role: currentUserRole } = _req.user;
@@ -575,7 +573,7 @@ export class UserController {
       }
 
       let query: any = {
-        username: { $in: Array.from(activePlayers).map((player: ActivePlayer) => player.username) },
+
       };
 
       // Handle date range filtering
@@ -671,20 +669,12 @@ export class UserController {
 
       const players = await PlayerModel.find(query).skip(skip).limit(limit);
 
-      const playersWithGameInfo = players.map(player => {
-        const activePlayer = Array.from(activePlayers).find((ap: ActivePlayer) => ap.username === player.username) as ActivePlayer | undefined;
-
-        return {
-          ...player.toObject(),
-          currentGame: activePlayer?.currentGame || 'inactive',
-        };
-      });
 
       res.status(200).json({
         totalSubordinates: playerCount,
         totalPages,
         currentPage: page,
-        subordinates: playersWithGameInfo,
+        subordinates: [],
       });
     } catch (error) {
       next(error);

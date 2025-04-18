@@ -1,7 +1,8 @@
 import { Socket } from "socket.io";
-import { Player } from "./dashboard/users/userModel";
 import { sessionManager } from "./dashboard/session/sessionManager";
 import { PlatformSessionModel } from "./dashboard/session/sessionModel";
+import { redisClient } from "./config/redis";
+import { Channels, Events } from "./utils/events";
 
 
 export interface socketConnectionData {
@@ -13,7 +14,6 @@ export interface socketConnectionData {
     cleanedUp: boolean;
 }
 
-//
 export default class Manager {
     username: string;
     credits: number;
@@ -26,7 +26,80 @@ export default class Manager {
         this.credits = credits;
         this.role = role;
         this.userAgent = userAgent;
-        this.initializeManager(socket);
+        this.initializeManagerSocket(socket);
+        this.subscribeToRedisEvents();
+    }
+
+    public async initializeManagerSocket(socket: Socket) {
+        this.resetSocketData();
+
+        this.socketData = {
+            socket: socket,
+            heartbeatInterval: setInterval(() => { }, 0),
+            reconnectionAttempts: 0,
+            maxReconnectionAttempts: 3,
+            reconnectionTimeout: null,
+            cleanedUp: false
+        };
+
+        this.initializeSocketHandler();
+
+        // ✅ Restart heartbeat when the manager reconnects
+        sessionManager.startControlHeartbeat(this);
+
+        // ✅ Send all active players when the manager first connects
+        const allPlayers = await this.handleGetAllPlayers();
+        this.sendData({ type: Events.PLAYGROUND_ALL, payload: allPlayers });
+
+        // Handle disconnection logic
+        this.socketData.socket.on("disconnect", () => {
+            console.log(`Manager ${this.username} disconnected`);
+            this.handleDisconnection();
+        });
+    }
+
+    public subscribeToRedisEvents() {
+        const channel = Channels.CONTROL(this.role, this.username);
+        console.log(`${this.username} : joined  : ${channel}`)
+
+        redisClient.subClient.subscribe(channel, (message) => {
+            const data = JSON.parse(message);
+            console.log(`🔄 Syncing state for ${this.username}:`, data);
+
+            switch (data.type) {
+                case Events.CONTROL_CREDITS:
+                    this.credits = data.payload.credits;
+                    this.sendData({ type: Events.CONTROL_CREDITS, payload: this.credits });
+                    break;
+
+                case Events.PLAYGROUND_ENTER:
+                    this.sendData({ type: Events.PLAYGROUND_ENTER, payload: data.payload });
+                    break;
+
+                case Events.PLAYGROUND_EXIT:
+                    this.sendData({ type: Events.PLAYGROUND_EXIT, payload: data.payload });
+                    break;
+
+                case Events.PLAYGROUND_GAME_ENTER:
+                    this.sendData({ type: Events.PLAYGROUND_GAME_ENTER, payload: data.payload });
+                    break;
+
+                case Events.PLAYGROUND_GAME_EXIT:
+                    this.sendData({ type: Events.PLAYGROUND_GAME_EXIT, payload: data.payload });
+                    break;
+
+                case Events.PLAYGROUND_GAME_SPIN:
+                    this.sendData({ type: Events.PLAYGROUND_GAME_SPIN, payload: data.payload });
+                    break;
+
+                case Events.PLAYGROUND_ALL:
+                    this.handleGetAllPlayers();
+                    break;
+
+                default:
+                    console.log(`Unknown message type: ${data.type}`);
+            }
+        })
     }
 
     private resetSocketData() {
@@ -45,53 +118,29 @@ export default class Manager {
         }
     }
 
+    private async handleDisconnection() {
+        // ❌ Stop the heartbeat when manager disconnects
+        sessionManager.stopControlHeartbeat(this);
+        await sessionManager.removeControlUser(this.username, this.role);
 
-    public initializeManager(socket: Socket) {
-        this.resetSocketData();
 
-        this.socketData = {
-            socket: socket,
-            heartbeatInterval: setInterval(async () => {
-                if (this.socketData.socket) {
-                    const activePlayers = await sessionManager.getPlayersSummariesByManager(this.username, this.role);
-                    this.socketData.socket.emit("activePlayers", activePlayers);
-                    this.sendData({ type: "CREDITS", payload: { credits: this.credits, role: this.role } })
-                }
-            }, 5000),
-            reconnectionAttempts: 0,
-            maxReconnectionAttempts: 3,
-            reconnectionTimeout: null,
-            cleanedUp: false
-        }
-
-        this.initializeSocketHandler();
-
-        this.socketData.socket.on("disconnect", () => {
-            console.log(`Manager ${this.username} disconnected`);
-            this.handleDisconnection();
-        });
-        this.sendData({ type: "CREDITS", payload: { credits: this.credits, role: this.role } })
-    }
-
-    private handleDisconnection() {
-        clearInterval(this.socketData.heartbeatInterval); // Clear heartbeat on disconnect
+        clearInterval(this.socketData.heartbeatInterval);
         this.socketData.socket = null;
 
-        this.socketData.reconnectionTimeout = setTimeout(() => {
+        this.socketData.reconnectionTimeout = setTimeout(async () => {
             console.log(`Removing manager ${this.username} due to prolonged disconnection`);
-            sessionManager.deleteManagerByUsername(this.username)
-        }, 60000); // 1-minute timeout for reconnection
+        }, 60000);
     }
 
-
+    // TODO: Check we are using this
     private initializeSocketHandler() {
         if (this.socketData.socket) {
             this.socketData.socket.on("data", async (message, callback) => {
                 try {
                     const res = message as { action: string; payload: any };
                     switch (res.action) {
-                        case "PLAYER_STATUS":
-                            await this.playerStatusHandler(res.payload, callback);
+                        case Events.PLAYGROUND_EXIT:
+                            await this.forceRemovePlayer(res.payload.playerId, callback);
                             break;
 
                         case "PLAYER_SESSION":
@@ -107,8 +156,6 @@ export default class Manager {
     }
 
 
-
-
     public notifyManager(data: { type: string, payload: any }) {
         if (this.socketData.socket) {
             this.socketData.socket.emit("PLATFORM", data);
@@ -117,49 +164,36 @@ export default class Manager {
         }
     }
 
-    private async playerStatusHandler(
-        data: { playerId: string; status: string },
+    private async forceRemovePlayer(
+        playerId: string,
         callback?: (response: { success: boolean; message: string }) => void
     ) {
         try {
-            // Attempt to retrieve the player document
-            const player = await Player.findOne({ username: data.playerId });
+            console.log(`🚨 Manager requested forceful removal of player: ${playerId}`);
 
-            if (!player) {
-                console.log("Player not found:", data.playerId);
-                if (callback) callback({ success: false, message: "Player not found" });
+            const playerSession = sessionManager.getPlaygroundUser(playerId);
+            if (!playerSession) {
+                console.warn(`⚠️ Player ${playerId} is not in an active session.`);
+                if (callback) callback({ success: false, message: "Player not found or already removed" });
                 return;
             }
 
-            // Attempt to update the status field
-            const updateResult = await Player.updateOne(
-                { username: data.playerId },
-                { $set: { status: data.status } }
-            );
+            // 🚀 Notify the player on the frontend
+            playerSession.sendData({ type: Events.PLAYGROUND_EXIT, message: "You have been removed by the manager." }, "platform");
 
-            // Check if the update was successful using modifiedCount
-            if (updateResult.modifiedCount === 0) {
-                console.warn(`No document modified for player: ${data.playerId}`);
-                if (callback) callback({ success: false, message: "No changes made to status" });
-                return;
-            }
+            // ⏳ Wait a moment to allow the client to process the message
+            setTimeout(async () => {
+                // ✅ Forcefully remove player session
+                await sessionManager.endSession(playerId);
 
-            // Notify the player socket of the status change
-            const playerSocket = sessionManager.getPlayerPlatform(data.playerId)
+                console.log(`✅ Player ${playerId} forcefully removed by manager.`);
 
-            if (playerSocket) {
-                if (data.status === "inactive") {
-                    await playerSocket.forceExit(false);
-                    console.log(`Player ${data.playerId} exited from platform due to inactivity`);
-                } else {
-                    playerSocket.sendData({ type: "STATUS", data: { status: data.status } }, "platform");
-                }
-            }
+                if (callback) callback({ success: true, message: "Player successfully removed" });
+            }, 500); // Delay to ensure message is received before disconnecting
 
-            if (callback) callback({ success: true, message: "Status updated successfully" });
         } catch (error) {
-            console.error("Error updating player status:", error);
-            if (callback) callback({ success: false, message: "Error updating status" });
+            console.error(`❌ Error forcefully removing player ${playerId}:`, error);
+            if (callback) callback({ success: false, message: "Error removing player" });
         }
     }
 
@@ -185,13 +219,59 @@ export default class Manager {
         }
     }
 
+    public async handleGetAllPlayers(): Promise<any[]> {
+        try {
+            const allPlayers: any[] = [];
+            const playgroundKeys = await redisClient.pubClient.keys(Channels.PLAYGROUND("*"));
+
+            for (const playerKey of playgroundKeys) {
+                const playerData = await redisClient.pubClient.hGetAll(playerKey);
+
+                if (Object.keys(playerData).length === 0) continue;
+
+                let currentGame = null;
+                if (playerData.currentGame && playerData.currentGame !== "null") {
+                    try {
+                        currentGame = JSON.parse(playerData.currentGame);
+
+                        // ✅ Ensure gameName is always defined
+                        if (!currentGame.gameName) {
+                            currentGame.gameName = "Unknown Game";
+                        }
+                    } catch (error) {
+                        console.error(`❌ Failed to parse currentGame for ${playerData.playerId}:`, error);
+                    }
+                }
+
+                allPlayers.push({
+                    playerId: playerData.playerId,
+                    status: playerData.status,
+                    initialCredits: playerData.initialCredits ? parseFloat(playerData.initialCredits) : 0,
+                    currentCredits: playerData.currentCredits ? parseFloat(playerData.currentCredits) : 0,
+                    managerName: playerData.managerName || null,
+                    entryTime: playerData.entryTime ? new Date(playerData.entryTime) : null,
+                    exitTime: playerData.exitTime && playerData.exitTime !== "null" ? new Date(playerData.exitTime) : null,
+                    currentRTP: playerData.currentRTP ? parseFloat(playerData.currentRTP) : 0,
+                    userAgent: playerData.userAgent || "Unknown",
+                    currentGame: currentGame,
+                    platformId: playerData.platformId || null,
+                });
+            }
+
+            return allPlayers;
+        } catch (error) {
+            console.error("❌ Error fetching all playground players from Redis:", error);
+            return [];
+        }
+    }
+
     public sendMessage(data: any) {
         if (this.socketData.socket) {
             this.socketData.socket.emit("message", data)
         }
     }
 
-    public sendData(data: any) {
+    public sendData(data: { type: Events, payload: any }) {
         if (this.socketData.socket) {
             this.socketData.socket.emit("data", data)
         }

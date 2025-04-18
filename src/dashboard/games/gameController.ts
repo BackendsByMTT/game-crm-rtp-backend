@@ -8,6 +8,7 @@ import cloudinary from "cloudinary";
 import { config } from "../../config/config";
 import Payouts from "../payouts/payoutModel";
 import path from "path";
+import { redisClient } from "../../config/redis";
 import { sessionManager } from "../session/sessionManager";
 
 cloudinary.v2.config({
@@ -144,27 +145,46 @@ export class GameController {
     try {
       const _req = req as AuthRequest;
       const { username, role } = _req.user;
-
       const { gameId: slug } = req.params;
 
-      const currentPlayer = await Player.aggregate([
-        { $match: { username: username, role: role, status: "active" } },
-        { $limit: 1 }
-      ]);
+      // Validate request parameters
+      if (!slug) {
+        throw createHttpError(400, "Game ID parameter is required");
+      }
 
-      if (!currentPlayer[0]) {
-        console.log('user is inactive contact to your store')
-        throw createHttpError(403, "user is inactive contact to your store")
+      // Check if player exists and is active
+      const currentPlayer = await Player.findOne({
+        username,
+        role,
+        status: "active"
+      }).lean();
+
+
+      if (!currentPlayer) {
+        console.log(`Player ${username} is inactive`);
+        throw createHttpError(403, "Account is inactive, please contact support");
       }
 
       if (!slug) {
         throw createHttpError(400, "Slug parameter is required");
       }
 
-      const existingUser = sessionManager.getPlayerPlatform(username)
+      const playerSession = await sessionManager.getPlaygroundUser(username);
+      if (!playerSession) {
+        console.log(`❌ No active session found for player ${username}`);
+        throw createHttpError(403, "No active session found. Please reconnect to the platform");
+      }
 
-      if (existingUser && existingUser.gameData.socket) {
-        throw createHttpError(403, "You already have an active game session. Please wait for a while before disconnecting")
+      // Ensure player is active
+      if (playerSession.playerData.status !== "active") {
+        console.log(`Player ${username} is inactive`);
+        throw createHttpError(403, "Account is inactive, please contact support");
+      }
+
+      // Check if the player has an active game session
+      if (playerSession.currentGameData && playerSession.currentGameData.socket && playerSession.currentGameData.socket.connected) {
+        console.log(`Player ${username} already has an active game: ${playerSession.currentGameData.gameId}`);
+        throw createHttpError(403, "You already have an active game session. Please finish your current game first");
       }
       
 
@@ -181,24 +201,26 @@ export class GameController {
       ]);
 
       const game = platform[0];
-      // Extract the main domain by removing any leading subdomain
-      const mainDomain = config.hosted_url_cors.replace(/^[^.]+\./, '');
-      const hostPattern = new RegExp(`(^|\\.)${mainDomain.replace('.', '\\.')}$`);
-      // Check if the game URL exists and matches the pattern
-
+      // URL security check for production environments
       if (config.env === 'development') {
-        if (game) {
-          res.status(200).json({ url: game.url });
-        } else {
-          console.log('Unauthorized request');
-          throw createHttpError(401, "Unauthorized request");
-        }
+        res.status(200).json({
+          url: game.url,
+          name: game.name || slug
+        });
       } else {
-        if (game && hostPattern.test(game.url)) {
-          res.status(200).json({ url: game.url });
+        // Extract the main domain by removing any leading subdomain
+        const mainDomain = config.hosted_url_cors.replace(/^[^.]+\./, '');
+        const hostPattern = new RegExp(`(^|\\.)${mainDomain.replace('.', '\\.')}$`);
+
+        // Validate URL against domain pattern
+        if (hostPattern.test(game.url)) {
+          res.status(200).json({
+            url: game.url,
+            name: game.name || slug
+          });
         } else {
-          console.log('Unauthorized request');
-          throw createHttpError(401, "Unauthorized request");
+          console.log(`Unauthorized game URL: ${game.url}`);
+          throw createHttpError(401, "Unauthorized game provider");
         }
       }
 
@@ -208,6 +230,7 @@ export class GameController {
       }
 
     } catch (error) {
+      console.error("Error fetching game by slug:", error);
       next(error);
     }
   }

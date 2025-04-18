@@ -134,7 +134,7 @@ export default class KenoBaseGame implements RequiredSocketMethods {
       }
       console.log(response.join('\n'));
       // writeMultipleArraysToCSV("hitFreqKeno.csv", hitsLength);
-      
+
       // // testing gen paytable
       // generatePaytableJSON(80, 20, 10, 85, examplePayoutMultiplier, "paytable.json");
     } catch (error) {
@@ -148,7 +148,7 @@ export default class KenoBaseGame implements RequiredSocketMethods {
   public async spinResult(): Promise<void> {
     try {
       const playerData = this.getPlayerData();
-      const platformSession = sessionManager.getPlayerPlatform(playerData.username);
+      const platformSession = await sessionManager.getPlaygroundUser(playerData.username);
 
       if (this.settings.currentBet > playerData.credits) {
         this.sendError("Low Balance");
@@ -160,11 +160,11 @@ export default class KenoBaseGame implements RequiredSocketMethods {
       this.playerData.totalBet = precisionRound(this.playerData.totalBet + currentBet, 5);
 
       const spinId = platformSession.currentGameSession.createSpin();
-      platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
+      await platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
 
       checkForWin(this);
       const winAmount = this.playerData.currentWinning;
-      platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', winAmount);
+      await platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', winAmount);
     } catch (error) {
       this.sendError("Spin error");
       console.error("Failed to generate spin results:", error);

@@ -1,114 +1,117 @@
-import express, { NextFunction, Request, Response } from "express";
-import cors from "cors";
-import { createServer } from "http";
 import { Server } from "socket.io";
-import globalErrorHandler from "./dashboard/middleware/globalHandler";
-import adminRoutes from "./dashboard/admin/adminRoutes";
-import userRoutes from "./dashboard/users/userRoutes";
-import transactionRoutes from "./dashboard/transactions/transactionRoutes";
-import gameRoutes from "./dashboard/games/gameRoutes";
-import { config } from "./config/config";
-import svgCaptcha from "svg-captcha";
-import createHttpError from "http-errors";
-import socketController from "./socket";
-import payoutRoutes from "./dashboard/payouts/payoutRoutes";
-import { checkUser } from "./dashboard/middleware/checkUser";
-import toggleRoutes from "./dashboard/Toggle/ToggleRoutes";
-import { checkRole } from "./dashboard/middleware/checkRole";
-import sessionRoutes from "./dashboard/session/sessionRoutes";
-import { addOrderToExistingGames } from "./dashboard/games/script"
-import appRoutes from "./dashboard/app/appRoute";
-import path from "path";
+import { socketAuth } from "./dashboard/middleware/socketAuth";
+import { sessionManager } from "./dashboard/session/sessionManager";
+import { User } from "./dashboard/users/userModel";
+import { messageType } from "./game/Utils/gameUtils";
+import Manager from "./Manager";
+import { createAdapter } from "@socket.io/redis-adapter";
+import { redisClient } from "./config/redis";
+import { Channels } from "./utils/events";
 
-declare module "express-session" {
-  interface Session {
-    captcha?: string;
-  }
+
+export async function setupWebSocket(server: any, corsOptions: any) {
+    try {
+        const io = new Server(server, { cors: corsOptions });
+        io.use(socketAuth);
+
+        await redisClient.connect();
+
+        io.adapter(createAdapter(redisClient.pubClient, redisClient.subClient));
+
+        const namespaces = {
+            playground: io.of("/playground"),
+            control: io.of("/control"),
+            game: io.of("/game")
+        };
+
+        Object.values(namespaces).forEach((ns) => ns.use(socketAuth));
+
+        // ✅ Playground Namespace (For Players)
+        namespaces.playground.on("connection", async (socket) => {
+            const { username, role } = socket.data.user;
+            const userAgent = socket.handshake.headers["user-agent"];
+            const playgroundId = socket.handshake.auth.playgroundId;
+
+            if (role !== "player") {
+                socket.disconnect();
+                return;
+            }
+
+            if (!playgroundId) {
+                this.disconnectWithError(socket, "No playgroundId provided.");
+                return;
+            }
+
+            let existingSession = sessionManager.getPlaygroundUser(username);
+            if (existingSession) {
+                if (existingSession.platformData.socket.connected) {
+                    if (existingSession.platformData.platformId === playgroundId) {
+                        this.disconnectWithError(socket, "Already connected in Playground.");
+                        return;
+                    }
+                    // this.disconnectWithError(socket, "Cannot connect to multiple Playgrounds simultaneously.");
+socket.emit('alert',"NewTab")
+                    return;
+                }
+
+                // 🔄 Restore session from memory
+                console.log(`🔄 Restoring session from memory for ${username}`);
+                existingSession.initializePlatformSocket(socket);
+                return;
+            }
+
+            const redisSession = await redisClient.pubClient.hGetAll(Channels.PLAYGROUND(username));
+            if (redisSession && Object.keys(redisSession).length > 0) {
+                console.log(`🔄 Restoring session from Redis for ${username}`);
+                const restoredSession = await sessionManager.restoreSessionFromRedis(redisSession, socket);
+                if (restoredSession) return;
+            }
+
+            await sessionManager.startSession(username, role, userAgent, socket);
+        });
+
+        // 🎮 Game Namespace (For Players)
+        namespaces.game.on("connection", async (socket) => {
+            const { username } = socket.data.user;
+            const gameId = socket.handshake.auth.gameId;
+
+            // 🚀 Start game session
+            console.log(`🎰 Player ${username} entering game: ${gameId}`);
+            await sessionManager.startGame(username, gameId, socket);
+        });
+
+        // 🛠️ Control Namespace (For Managers)
+        namespaces.control.on("connection", async (socket) => {
+            const { username, role } = socket.data.user;
+            const userAgent = socket.handshake.headers["user-agent"];
+
+            let existingManager = sessionManager.getControlUser(username);
+            if (existingManager) {
+                console.log(`🔄 Restoring control session from memory for ${username}`);
+                existingManager.initializeManagerSocket(socket);
+                return;
+            }
+
+            const redisSession = await redisClient.pubClient.hGetAll(Channels.CONTROL(role, username));
+            if (redisSession && Object.keys(redisSession).length > 0) {
+                console.log(`🔄 Restoring control session from Redis for ${username}`);
+                const restoredManager = await sessionManager.restoreControlUserFromRedis(redisSession, socket);
+                if (restoredManager) return;
+            }
+
+            await sessionManager.addControlUser(username, role, socket);
+        });
+
+    } catch (error) {
+        console.error("❌ Error setting up WebSocket:", error);
+        process.exit(1);
+    }
 }
 
-const app = express();
 
-// Body parser
-app.use(express.json({ limit: "25mb" }));
-app.use(express.urlencoded({ limit: "25mb", extended: true }));
 
-// Custom CORS middleware
-app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-  next();
-});
-
-app.use(cors({
-  origin: [`*.${config.hosted_url_cors}`, 'https://game-crm-rtp-backend.onrender.com']
-}));
-
-const server = createServer(app);
-
-// HEALTH CHECK ROUTE — make sure this comes BEFORE static
-app.get("/", (req, res, next) => {
-  const health = {
-    uptime: process.uptime(),
-    message: "OK",
-    timestamp: new Date().toLocaleDateString(),
-  };
-  res.status(200).json(health);
-});
-
-// CAPTCHA
-app.get("/captcha", async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const captcha = svgCaptcha.create();
-    if (captcha) {
-      req.session.captcha = captcha.text;
-      res.status(200).json(captcha.data);
-    } else {
-      throw createHttpError(404, "Error Generating Captcha, Please refresh!");
-    }
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Render the game manually
-app.get("/play", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
-// Your routes
-app.use("/api/company", adminRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/transactions", transactionRoutes);
-app.use("/api/games", gameRoutes);
-app.use("/api/payouts", checkUser, checkRole(["admin"]), payoutRoutes);
-app.use("/api/toggle", checkUser, checkRole(["admin"]), toggleRoutes);
-app.use("/api/session", sessionRoutes);
-app.use("/api/app", appRoutes);
-
-// ✅ Static middleware AFTER routes and disable auto-index.html
-app.use(express.static(path.join(__dirname, "public"), { index: false }));
-
-// Socket.io
-const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"],
-  },
-  transports: ["websocket"],
-  pingInterval: 25000,
-  pingTimeout: 60000,
-  allowEIO3: false,
-});
-
-socketController(io);
-addOrderToExistingGames();
-
-// Global Error Handler
-app.use(globalErrorHandler);
-
-export default server;
+function disconnectWithError(socket: any, message: string) {
+    console.log(`🚨 ${message}`);
+    socket.emit("error", { message });
+    socket.disconnect();
+}

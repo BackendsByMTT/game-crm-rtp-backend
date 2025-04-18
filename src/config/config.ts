@@ -2,7 +2,7 @@ import { config as conf } from "dotenv";
 conf();
 
 const _config = {
-  port: process.env.PORT || 5000,
+  port: process.env.PORT || 5001,
   databaseUrl: process.env.MONGOURL,
   env: process.env.NODE_ENV,
   jwtSecret: process.env.JWT_SECRET,
@@ -19,5 +19,6 @@ const _config = {
   sentToemail: process.env.SENT_TO_EMAIL,
   hosted_url_cors: process.env.HOSTED_URL_CORS,
   redis_url: process.env.REDIS_URL,
+  allowedOrigins: (process.env.ALLOWED_ORIGINS || '').split(','),
 };
 export const config = Object.freeze(_config);

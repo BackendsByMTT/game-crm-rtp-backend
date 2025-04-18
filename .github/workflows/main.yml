@@ -3,7 +3,7 @@ name: Build and Deploy
 on:
   push:
     branches:
-      - "dev"
+      - "dev-g"
   workflow_dispatch:
 
 permissions:
@@ -26,16 +26,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.G_TOKEN }}
         run: |
-          git checkout dev
-          git checkout -b dev-build
-          git config user.name "TrippyRahul"
-          git config user.email "rahulrawat.trippybug@gmail.com"
-          rm -rf ./src 
-          rm -rf ./app.js 
-          rm -rf ./copyStaticAsset.js
-          git add .
-          git commit -m "remove old artifacts" || echo "No changes to commit"
-          git checkout dev
+          git checkout dev-g
+          git checkout -b dev-build-g
+        # git config user.name "TrippyRahul"
+        # git config user.email "rahulrawat.trippybug@gmail.com"
+        # rm -rf ./src ./app.js
+        # git add .
+        # git commit -m "remove old artifacts" || echo "No changes to commit"
+        # git checkout dev-g
          
       - name: Install Dependencies
         run: npm install
@@ -51,13 +49,24 @@ jobs:
 
       - name: Copy Src and app.js in root
         run: |
+          git config --global user.email "prathamesh@underpinservices.com"
+          git config --global user.name "Prathm0025"
           git stash -u
-          git checkout dev-build
+          git checkout dev-build-g
+          
+          # Copy built files
           cp -r ./dist/src .
           cp -r ./dist/app.js .
-          git checkout dev -- copyStaticAsset.js
+
+          # Clean up
           rm -rf ./dist
           rm -rf ./node_modules
-          git add -f ./app.js ./src ./copyStaticAsset.js
+          rm -rf ./app.ts
+
+          # Delete all .ts files just in case
+          find ./src -name "*.ts" -type f -delete
+
+          git add -f ./app.js ./src
           git commit -m "add new build" || echo "No changes to commit"
-          git push origin dev-build --force
+          git push origin dev-build-g --force
+  
