@@ -178,7 +178,7 @@ export class UserController {
       const token = jwt.sign(
         { id: user._id, username: user.username, role: user.role },
         config.jwtSecret!,
-        { expiresIn: "7d" }
+        { expiresIn: "1d" }
       );
 
 
