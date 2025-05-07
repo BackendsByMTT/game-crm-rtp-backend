@@ -603,7 +603,7 @@ export function makeResultJson(gameInstance: SLGOW) {
         symbolsToEmit: settings._winData.winningSymbols,
         isFreeSpin: settings.freeSpin.isTriggered,
         count: settings.freeSpin.freeSpinCount,
-        goldWildCol: settings.goldWild.cols,
+        goldWildCol: settings.freeSpin.freeSpinCount > 0 ? settings.goldWild.cols : [],
         featureAll: settings.featureAll,
       },
       PlayerData: {
