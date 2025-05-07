@@ -11,15 +11,19 @@ import createHttpError from "http-errors";
 import { socketConnectionData } from "./utils/utils";
 import { sessionManager } from "./dashboard/session/sessionManager";
 import { GameSession } from "./dashboard/session/gameSession";
-
+import { redisClient } from "./config/redis";
+import { Channels, Events } from "./utils/events";
 
 
 export interface currentGamedata {
-  gameId: string | null;
   username: string,
+  gameId: string | null;
   gameSettings: any;
   currentGameManager: GameManager;
   session: GameSession | null;
+  socket: Socket | null;
+  heartbeatInterval: NodeJS.Timeout;
+
   sendMessage: (action: string, message: any, isGameSocket: boolean) => void;
   sendError: (message: string, isGameSocket: boolean) => void;
   sendAlert: (message: string, isGameSocket: boolean) => void;
@@ -27,8 +31,6 @@ export interface currentGamedata {
   deductPlayerBalance: (message: number) => void;
   getPlayerData: () => playerData;
 }
-
-
 
 export interface playerData {
   username: string;
@@ -41,7 +43,6 @@ export interface playerData {
 
 export default class PlayerSocket {
   platformData: socketConnectionData;
-  gameData: socketConnectionData;
   currentGameData: currentGamedata;
 
   playerData: playerData;
@@ -51,31 +52,14 @@ export default class PlayerSocket {
   exitTime: Date | null = null;
   currentRTP: number = 0;
   currentGameSession: GameSession | null = null;
+  lastPing: Date = null;
+  sessionId: string;
 
 
-  constructor(
-    username: string,
-    role: string,
-    status: string,
-    credits: number,
-    userAgent: string,
-    socket: Socket,
-    managerName: string
-  ) {
-
-
-    const existing = sessionManager.getPlayerPlatform(username);
-    if (existing && existing.platformData.socket.id !== socket.id) {
-      existing.initializePlatformSocket(socket);
-      return;
-    }
+  constructor(username: string, role: string, status: string, credits: number, userAgent: string, socket: Socket, managerName: string) {
 
     this.playerData = {
-      username,
-      role,
-      credits,
-      userAgent,
-      status
+      username, role, credits, userAgent, status
     };
 
     this.entryTime = new Date();
@@ -93,22 +77,15 @@ export default class PlayerSocket {
 
     }
 
-    this.gameData = {
-      socket: null,
-      heartbeatInterval: setInterval(() => { }, 0),
-      reconnectionAttempts: 0,
-      maxReconnectionAttempts: 3,
-      reconnectionTimeout: 1000,
-      cleanedUp: false,
-    };
-
-
     this.currentGameData = {
-      gameId: null,
       username: this.playerData.username,
+      gameId: null,
       gameSettings: null,
       currentGameManager: null,
       session: null,
+      socket: null,
+      heartbeatInterval: setInterval(() => { }, 0),
+
       sendMessage: this.sendMessage.bind(this),
       sendError: this.sendError.bind(this),
       sendAlert: this.sendAlert.bind(this),
@@ -118,99 +95,130 @@ export default class PlayerSocket {
     };
 
     this.initializePlatformSocket(socket);
+    this.subscribeToRedisEvents();
   }
 
+  public subscribeToRedisEvents() {
+    redisClient.subClient.subscribe(Channels.PLAYGROUND(this.playerData.username), (message) => {
+      const data = JSON.parse(message);
+      console.log(`🔄 Syncing player state for ${this.playerData.username}:`, data);
+
+      switch (data.type) {
+        case Events.PLAYGROUND_CREDITS:
+          this.playerData.credits = data.payload.credits;
+          this.sendData({ type: Events.PLAYGROUND_CREDITS, data: { credits: this.playerData.credits } }, "platform");
+          break;
+
+        case Events.PLAYGROUND_GAME_UPDATE:
+          if (this.currentGameData.gameId === data.payload.tagName) {
+            console.log(`🎮 Updating game settings for ${this.playerData.username}`);
+
+            this.currentGameData.gameSettings = data.payload.payoutData;
+            this.currentGameData.currentGameManager.currentGameType.currentGame.initialize(data.payload.payoutData);
+
+            this.sendAlert(`Game ${data.payload.tagName} updated to version ${data.payload.newVersion}`, true);
+          }
+          break;
+
+        default:
+          console.log(`Unknown message type: ${data.type}`);
+      }
+    });
+  }
 
 
   public async initializePlatformSocket(socket: Socket) {
-    if (this.gameData.socket) {
-      await this.cleanupGameSocket()
+    try {
+      if (this.currentGameData.socket) {
+        await this.cleanupGameSocket();
+      }
+
+      this.platformData.socket = socket;
+      this.platformData.platformId = socket.handshake.auth.platformId;
+
+      this.platformData.socket.on(Events.PLAYGROUND_GAME_URL, this.handleGetGameUrl.bind(this));
+      this.platformData.socket.on('pong', () => {
+        this.lastPing = new Date();
+      });
+
+      this.messageHandler(false);
+      this.onExit();
+
+
+      if (this.platformData.socket) {
+        this.platformData.socket.on("disconnect", () => {
+          this.handlePlatformDisconnection();
+        });
+      } else {
+        console.error("Socket is null during initialization of disconnect event");
+      }
+
+      sessionManager.startSessionHeartbeat(this);
+      this.sendData({ type: Events.PLAYGROUND_CREDITS, payload: { credits: this.playerData.credits } }, "platform")
+
+      if (this.currentGameData.gameId && !this.currentGameData.socket) {
+        this.initializeGameSocket(socket);
+      }
+    } catch (error) {
+      console.error("Error initializing platform socket:", error);
     }
-
-    await sessionManager.startPlatformSession(this)
-    this.platformData.socket = socket;
-    this.platformData.platformId = socket.handshake.auth.platformId;
-    this.messageHandler(false);
-    this.startPlatformHeartbeat();
-    this.onExit();
-
-
-    if (this.platformData.socket) {
-      this.platformData.socket.on("disconnect", () => {
-        this.handlePlatformDisconnection()
-      })
-    } else {
-      console.error("Socket is null during initialization of disconnect event");
-    }
-
-    this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits } }, "platform");
   }
 
-  private initializeGameSocket(socket: Socket) {
-
-    if (this.gameData.socket) {
-      this.cleanupGameSocket();
-    }
-
-    this.gameData.socket = socket;
-    this.currentGameData.gameId = socket.handshake.auth.gameId;
-    sessionManager.startGameSession(this.playerData.username, this.currentGameData.gameId, this.playerData.credits)
-
-    this.gameData.socket.on("disconnect", () => this.handleGameDisconnection());
-    this.initGameData();
-    this.startGameHeartbeat();
-    this.onExit(true)
-    this.messageHandler(true);
-    this.gameData.socket.emit("socketState", true);
-  }
-
-  // Handle platform disconnection and reconnection
   private handlePlatformDisconnection() {
     if (process.env.NODE_ENV == "testing") return;
     this.attemptReconnection(this.platformData)
   }
 
-  // Handle game disconnection and reconnection
+  public async cleanupPlatformSocket() {
+    try {
+      await sessionManager.endSession(this.playerData.username);
+
+      if (this.platformData.socket) {
+        this.platformData.platformId = null;
+        this.platformData.socket.disconnect(true);
+        this.platformData.socket = null;
+      }
+
+      clearInterval(this.platformData.heartbeatInterval);
+      this.platformData.reconnectionAttempts = 0;
+      this.platformData.cleanedUp = true;
+
+    } catch (error) {
+      console.error("Error cleaning up platform socket:")
+    }
+  }
+
+  private async initializeGameSocket(socket: Socket) {
+    this.currentGameData.socket = socket;
+    this.currentGameData.gameId = socket.handshake.auth.gameId;
+    this.currentGameData.socket.on("disconnect", () => this.handleGameDisconnection());
+    this.initGameData();
+    this.startGameHeartbeat();
+    this.onExit(true)
+    this.messageHandler(true);
+    this.currentGameData.socket.emit("socketState", true);
+
+    console.log("INIAILIZED : INITALITZED PROPELRY ")
+  }
+
+
+
+  // Handle game disconnection - immediately clean up without reconnection attempts
   private handleGameDisconnection() {
     if (process.env.NODE_ENV == "testing") return;
-    this.attemptReconnection(this.gameData);
+    this.cleanupGameSocket();
   }
 
   // Cleanup only the game socket
   private async cleanupGameSocket() {
-    await sessionManager.endGameSession(this.playerData.username, this.playerData.credits);
-
-    if (this.gameData.socket) {
-      this.gameData.socket.disconnect(true);
-      this.gameData.socket = null;
-    }
-    clearInterval(this.gameData.heartbeatInterval);
-
-    this.currentGameData.currentGameManager = null;
-    this.currentGameData.gameSettings = null;
-    this.currentGameData.gameId = null;
-    this.gameData.reconnectionAttempts = 0;
-
-    if (process.env.NODE_ENV === "testing") {
-      this.cleanupPlatformSocket()
+    try {
+      await sessionManager.endGame(this.playerData.username);
+    } catch (error) {
+      console.error(`❌ Error cleaning up game session for ${this.playerData.username}:`, error);
     }
   }
 
-  // Cleanup only the platform socket
-  public async cleanupPlatformSocket() {
-    await sessionManager.endPlatformSession(this.playerData.username);
 
-
-    if (this.platformData.socket) {
-      this.platformData.platformId = null;
-      this.platformData.socket.disconnect(true);
-      this.platformData.socket = null;
-    }
-
-    clearInterval(this.platformData.heartbeatInterval);
-    this.platformData.reconnectionAttempts = 0;
-    this.platformData.cleanedUp = true;
-  }
 
   // Attempt reconnection  for platform or game socket based on provided data
   private async attemptReconnection(socketData: socketConnectionData) {
@@ -243,25 +251,11 @@ export default class PlayerSocket {
   }
 
 
-  // Start heartbeat for platform socket
-  private startPlatformHeartbeat() {
-    if (this.platformData.socket) {
-      this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits } }, "platform");
-
-      this.platformData.heartbeatInterval = setInterval(() => {
-        if (this.gameData.socket) {
-          this.sendAlert(`Currenlty Playing : ${this.currentGameData.gameId}`)
-        }
-        this.sendData({ type: "CREDIT", data: { credits: this.playerData.credits } }, "platform");
-      }, 5000)
-    }
-  }
-
   // Start heartbeat for game socket
   private startGameHeartbeat() {
-    if (this.gameData.socket) {
-      this.gameData.heartbeatInterval = setInterval(() => {
-        if (this.gameData.socket && this.currentGameData.gameId) {
+    if (this.currentGameData.socket) {
+      this.currentGameData.heartbeatInterval = setInterval(() => {
+        if (this.currentGameData.socket && this.currentGameData.gameId) {
           this.sendAlert(`${this.playerData.username} : ${this.currentGameData.gameId}`)
         }
       }, 20000)
@@ -305,7 +299,7 @@ export default class PlayerSocket {
   }
 
   private async initGameData() {
-    if (!this.gameData.socket) return;
+    if (!this.currentGameData.socket) return;
 
     try {
       const tagName = this.currentGameData.gameId;
@@ -338,7 +332,7 @@ export default class PlayerSocket {
   }
 
   public sendMessage(action: string, message: any, isGameSocket: boolean = false) {
-    const socket = isGameSocket ? this.gameData.socket : this.platformData.socket;
+    const socket = isGameSocket ? this.currentGameData.socket : this.platformData.socket;
     if (socket) {
       socket.emit(
         messageType.MESSAGE,
@@ -349,7 +343,7 @@ export default class PlayerSocket {
 
   public sendData(data: any, type: "platform" | "game"): void {
     try {
-      const socket = type === "platform" ? this.platformData.socket : this.gameData.socket;
+      const socket = type === "platform" ? this.platformData.socket : this.currentGameData.socket;
       if (socket) {
         socket.emit(messageType.DATA, data)
       }
@@ -361,7 +355,7 @@ export default class PlayerSocket {
 
   // Send an error message to the client (either platform or game)
   public sendError(message: string, isGameSocket: boolean = false) {
-    const socket = isGameSocket ? this.gameData.socket : this.platformData.socket;
+    const socket = isGameSocket ? this.currentGameData.socket : this.platformData.socket;
     if (socket) {
       socket.emit(messageType.ERROR, message)
     }
@@ -369,7 +363,7 @@ export default class PlayerSocket {
 
   // Send an alert to the client (platform or game)
   public sendAlert(message: string, isGameSocket: boolean = false) {
-    const socket = isGameSocket ? this.gameData.socket : this.platformData.socket;
+    const socket = isGameSocket ? this.currentGameData.socket : this.platformData.socket;
     if (socket) {
       socket.emit(messageType.ALERT, message)
     }
@@ -377,7 +371,7 @@ export default class PlayerSocket {
 
   // Handle client message communication for the game socket
   private messageHandler(isGameSocket: boolean = false) {
-    const socket = isGameSocket ? this.gameData.socket : this.platformData.socket;
+    const socket = isGameSocket ? this.currentGameData.socket : this.platformData.socket;
 
     if (socket) {
       socket.on("message", (message) => {
@@ -390,6 +384,7 @@ export default class PlayerSocket {
           } else {
             // Handle platform-specific messages here if needed
             console.log(`Platform message received: ${response}`);
+          
           }
         } catch (error) {
           console.error("Failed to parse message:", error);
@@ -401,7 +396,7 @@ export default class PlayerSocket {
 
   // Handle user exit event for the game or platform
   public onExit(isGameSocket: boolean = false) {
-    const socket = isGameSocket ? this.gameData.socket : this.platformData.socket;
+    const socket = isGameSocket ? this.currentGameData.socket : this.platformData.socket;
     if (socket) {
       socket.on("EXIT", async () => {
         if (isGameSocket) {
@@ -458,6 +453,13 @@ export default class PlayerSocket {
   public async updatePlayerBalance(credit: number) {
     try {
       this.playerData.credits += credit;
+
+      await redisClient.pubClient.hSet(Channels.PLAYGROUND(this.playerData.username), {
+        "currentCredits": this.playerData.credits.toString()
+      });
+
+      this.sendData({ type: Events.PLAYGROUND_CREDITS, payload: { credits: this.playerData.credits } }, "platform");
+
       await this.updateDatabase();
     } catch (error) {
       console.error("Error updating credits in database:", error);
@@ -467,11 +469,52 @@ export default class PlayerSocket {
   public async deductPlayerBalance(currentBet: number) {
     this.checkPlayerBalance(currentBet);
     this.playerData.credits -= currentBet;
+
+    await redisClient.pubClient.hSet(Channels.PLAYGROUND(this.playerData.username), {
+      "currentCredits": this.playerData.credits.toString()
+    });
+
+    this.sendData({ type: Events.PLAYGROUND_CREDITS, payload: { credits: this.playerData.credits } }, "platform");
+
+  }
+
+  private async handleGetGameUrl(data: { slug: string }, callback: Function) {
+    try {
+      const { slug } = data;
+
+      console.log("HANDLE GET GAME URL", slug)
+  
+      if (!slug) {
+        return callback({ success: false, message: "Game slug is required" });
+      }
+  
+      if (this.currentGameSession?.gameId) {
+        return callback({ success: false, message: "Already in an active game session" });
+      }
+  
+      const platform = await Platform.aggregate([
+        { $unwind: "$games" },
+        { $match: { "games.slug": slug, "games.status": "active" } },
+        { $project: { _id: 0, url: "$games.url", name: "$games.name" } }
+      ]);
+  
+      if (!platform.length) {
+        return callback({ success: false, message: "Game not found or inactive" });
+      }
+  
+      const game = platform[0];
+  
+      return callback({ success: true, data: { url: game.url, name: game.name || slug } });
+    } catch (error) {
+      console.error(`Error in PLAYGROUND_GAME_GET_URL for ${this.playerData.username}:`, error);
+      return callback({ success: false, message: "Internal error while fetching game URL" });
+    }
   }
 
 
   public getSummary() {
     return {
+      sessionId: this.sessionId,
       playerId: this.playerData.username,
       status: this.playerData.status,
       managerName: this.managerName,
@@ -481,7 +524,8 @@ export default class PlayerSocket {
       exitTime: this.exitTime,
       currentRTP: this.currentRTP,
       currentGame: this.currentGameSession?.getSummary() || null,
-      userAgent: this.playerData.userAgent
+      userAgent: this.playerData.userAgent,
+      platformId: this.platformData.platformId
     }
   }
 

@@ -121,7 +121,7 @@ export class SLBE {
   public async spinResult(): Promise<void> {
     try {
       const playerData = this.getPlayerData();
-      const platformSession = sessionManager.getPlayerPlatform(playerData.username);
+      const platformSession = await sessionManager.getPlaygroundUser(playerData.username);
 
       if (this.settings.currentBet > playerData.credits) {
         this.sendError("Low Balance");
@@ -135,21 +135,21 @@ export class SLBE {
       }
 
       const spinId = platformSession.currentGameSession.createSpin();
-      platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
+      await platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
 
       new RandomResultGenerator(this);
       checkForWin(this)
       // this.gamebleTesting()
 
       const winAmount = this.playerData.currentWining;
-      platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', winAmount);
+      await platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', winAmount);
 
 
       const jackpotAmount = this.settings._winData.specialFeatures.jackpot.amountWon || 0;
       const scatterAmount = this.settings._winData.specialFeatures.scatter.amountWon || 0;
       const bonusAmount = this.settings._winData.specialFeatures.bonus.amountWon || 0;
 
-      platformSession.currentGameSession.updateSpinField(spinId, "specialFeatures", {
+      await platformSession.currentGameSession.updateSpinField(spinId, "specialFeatures", {
         jackpot: { amountWon: jackpotAmount },
         scatter: { amountWon: scatterAmount },
         bonus: { amountWon: bonusAmount },

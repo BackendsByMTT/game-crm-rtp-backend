@@ -71,7 +71,7 @@ export class SLONE {
     try {
       //TODO:
       const playerData = this.settings._winData.slotGame.getPlayerData()
-      const platformSession = sessionManager.getPlayerPlatform(playerData.username);
+      const platformSession = await sessionManager.getPlaygroundUser(playerData.username);
 
       // console.log('playerCredits', playerData.credits);
       //NOTE: low balance

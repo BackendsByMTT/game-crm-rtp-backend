@@ -72,7 +72,7 @@ export class SLBT {
     public async spinResult(): Promise<void> {
         try {
             const { username, credits } = this.getPlayerData();
-            const platformSession = sessionManager.getPlayerPlatform(username);
+            const platformSession = await sessionManager.getPlaygroundUser(username);
             if (this.settings.currentBet > credits) return this.sendError("Low Balance");
             const isFreeSpin = this.settings.freeSpin.freeSpinCount > 0;
             if (isFreeSpin) {
@@ -84,11 +84,11 @@ export class SLBT {
                 this.playerData.totalbet += this.settings.currentBet;
             }
             const spinId = platformSession.currentGameSession.createSpin();
-            platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
+            await platformSession.currentGameSession.updateSpinField(spinId, 'betAmount', this.settings.currentBet);
             await new RandomResultGenerator(this);
             checkForWin(this);
             this.settings.freeSpin.useFreeSpin = this.settings.freeSpin.freeSpinCount > 0;
-            platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', this.playerData.currentWining);
+            await platformSession.currentGameSession.updateSpinField(spinId, 'winAmount', this.playerData.currentWining);
         } catch (error) {
             console.error("Failed to generate spin results:", error);
             this.sendError("Spin error");

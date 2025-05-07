@@ -11,6 +11,7 @@ import bcrypt from "bcrypt";
 import { sessionManager } from "../dashboard/session/sessionManager";
 import { Player, User } from "../dashboard/users/userModel";
 import { Socket } from "socket.io";
+import { redisClient } from "../config/redis";
 
 
 const transactionController = new TransactionController()
@@ -102,25 +103,26 @@ export interface CustomJwtPayload extends JwtPayload {
   role: string;
 }
 
-export const updateStatus = (client: IUser | IPlayer, status: string) => {
+export const updateStatus = async (client: IUser | IPlayer, status: string) => {
   // Destroy SlotGame instance if we update user to inactive && the client is currently in a game
   const validStatuses = ["active", "inactive"];
   if (!validStatuses.includes(status)) {
     throw createHttpError(400, "Invalid status value");
   }
   client.status = status;
-  for (const [username, playerSocket] of sessionManager.getPlatformSessions()) {
-    if (playerSocket) {
-      const socketUser = sessionManager.getPlayerPlatform(client.username)
-      if (socketUser) {
-        if (status === 'inactive') {
-          socketUser.forceExit();
-        }
-      } else {
-        console.warn(`User ${client.username} does not have a current game or settings.`);
-      }
-    }
-  }
+  // TODO: NEED TO CONSIDER THIS
+  // for (const [username, playerSocket] of sessionManager.getPlatformSessions()) {
+  //   if (playerSocket) {
+  //     const socketUser = await sessionManager.getPlaygroundUser(client.username)
+  //     if (socketUser) {
+  //       if (status === 'inactive') {
+  //         socketUser.forceExit();
+  //       }
+  //     } else {
+  //       console.warn(`User ${client.username} does not have a current game or settings.`);
+  //     }
+  //   }
+  // }
 };
 
 export const updatePassword = async (
@@ -146,16 +148,12 @@ export const updateCredits = async (
   session.startTransaction();
 
   try {
-    const clientSocket = sessionManager.getPlatformSessions().get(client.username);
-    if (clientSocket) {
-      if (clientSocket.gameData.socket || clientSocket.currentGameData.gameId) {
-        throw createHttpError(409, "Cannot recharge while in a game")
+    if (client.role === "player") {
+      const playerData = await redisClient.pubClient.hGetAll(`playground:${client.username}`);
+      if (playerData && playerData.currentGame && playerData.currentGame !== "none") {
+        throw createHttpError(409, `Cannot update credits while the player is in a game: ${playerData.currentGameId}`);
       }
     }
-
-    const agentSocket = sessionManager.getActiveManagerByUsername(client.username);
-    const managerSocket = sessionManager.getActiveManagerByUsername(creator.username)
-
 
     const { type, amount } = credits;
 
@@ -185,31 +183,31 @@ export const updateCredits = async (
     await client.save({ session });
     await creator.save({ session });
 
-
-    if (
-      managerSocket &&
-      managerSocket.socketData.socket
-    ) {
-      managerSocket.sendData({
-        type: "CREDITS",
-        payload: { credits: creator.credits, role: creator.role }
-      });
-      managerSocket.credits = creator.credits;
+    if (client.role === "player") {
+      await redisClient.pubClient.publish(
+        `player:${client.username}`,
+        JSON.stringify({
+          type: "UPDATE_BALANCE",
+          payload: { credits: client.credits },
+        })
+      );
+    } else {
+      await redisClient.pubClient.publish(
+        `control:${client.role}:${client.username}`,
+        JSON.stringify({
+          type: "UPDATE_BALANCE",
+          payload: { credits: client.credits },
+        })
+      );
     }
 
-    if (agentSocket && agentSocket.socketData.socket) {
-      agentSocket.sendData({
-        type: "CREDITS",
-        payload: { credits: client.credits, role: client.role }
-      });
-      agentSocket.credits = client.credits
-    }
-
-    if (clientSocket && clientSocket.platformData.socket && clientSocket.platformData.socket.connected) {
-      clientSocket.playerData.credits = client.credits;
-      clientSocket.sendData({ type: "CREDIT", data: { credits: client.credits } }, "platform");
-      clientSocket.playerData.credits = client.credits;
-    }
+    await redisClient.pubClient.publish(
+      `control:${creator.role}:${creator.username}`,
+      JSON.stringify({
+        type: "UPDATE_BALANCE",
+        payload: { credits: creator.credits },
+      })
+    )
 
     await session.commitTransaction();
     session.endSession();

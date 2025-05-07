@@ -1,5 +1,5 @@
 import mongoose, { Model, Schema, Types } from "mongoose";
-import { IPlayer, IUser } from "./userType";
+import { IPlayer, IPlayerModel, IUser } from "./userType";
 
 export const UserSchema: Schema = new Schema<IUser>(
   {
@@ -38,6 +38,7 @@ UserSchema.virtual("subordinateModel").get(function (this: IUser) {
   return rolesHierarchy[this.role];
 });
 
+
 export const PlayerSchema = new Schema<IPlayer>(
   {
     username: { type: String, required: true, unique: true },
@@ -56,7 +57,26 @@ export const PlayerSchema = new Schema<IPlayer>(
   { timestamps: true }
 );
 
+PlayerSchema.statics.getHierarchyUsers = async function (username: string): Promise<IUser[]> {
+  const hierarchy: IUser[] = [];
+
+  const player = await this.findOne({ username: username }).populate("createdBy");
+  if (!player || !player.createdBy) {
+    console.error("Player not found or has no creator");
+    return hierarchy;
+  }
+
+  let currentManager = await User.findById(player.createdBy);
+
+  while (currentManager && currentManager.createdBy) {
+    hierarchy.push(currentManager);
+    currentManager = await User.findById(currentManager.createdBy);
+  }
+
+  return hierarchy;
+}
+
 const User: Model<IUser> = mongoose.model<IUser>("User", UserSchema);
-const Player: Model<IPlayer> = mongoose.model<IPlayer>("Player", PlayerSchema);
+const Player = mongoose.model<IPlayer, IPlayerModel>("Player", PlayerSchema);
 
 export { User, Player };
